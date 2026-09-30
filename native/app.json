@@ -1,0 +1,16 @@
+{
+  "name": "QuietGoals",
+  "displayName": "Quiet Goals",
+  "android": {
+    "package": "com.qurtesy.quietgoals",
+    "versionCode": 5
+  },
+  "extra": {
+    "eas": {
+      "projectId": "ebaf7041-2865-44a7-8dc5-40e39e2aada8"
+    }
+  },
+  "plugins": [
+    "expo-secure-store"
+  ]
+}

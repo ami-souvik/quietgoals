@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_name">QuietGoals</string>
+  <string name="widget_description">Shows your active goal on the home screen</string>
+</resources>
