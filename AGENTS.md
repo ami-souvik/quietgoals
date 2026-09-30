@@ -23,6 +23,14 @@ You are building "Quiet Goals Web": a single-list, keyboard-first, unapologetica
 - Mutations via Server Actions. UI uses useOptimistic so nothing shows a loading spinner.
 - Use the fractional-indexing package for goal ordering (TEXT position) so reordering never rewrites other rows.
 
+## MULTI-PLATFORM (WEB & MOBILE)
+- The codebase at the root is for **Quiet Goals Web** (Next.js App Router).
+- The code inside the `native/` directory is for **Quiet Goals Mobile** (React Native / Expo).
+- Both represent the **same system** across two platforms. Functionality, data models, behavior, keyboard/gesture paradigms, and UI design aesthetic must always be kept strictly in sync between Web and Native.
+
+## COMMIT POLICY
+- **Do not commit directly.** Only make git commits when the user has explicitly requested to commit.
+
 ## RULES
 - Original implementation only. Do not copy rows.gg code, assets, sounds, or copy text. Take inspiration from the interaction ideas only.
 - Every server action must verify the session and scope queries by user_id.
@@ -30,3 +38,4 @@ You are building "Quiet Goals Web": a single-list, keyboard-first, unapologetica
 - Small, targeted diffs. No unrelated refactors. No new dependencies without stating why.
 - After each phase: run typecheck, lint, and build; summarize what changed and what to verify manually.
 - Explicit non-goals: teams/sharing, comments, tags, due dates, subtasks, dashboards, notifications.
+

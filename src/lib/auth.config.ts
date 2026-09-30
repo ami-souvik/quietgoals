@@ -12,13 +12,15 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isLoginPage = nextUrl.pathname.startsWith('/login');
+      const isPublicPage =
+        nextUrl.pathname.startsWith('/login') ||
+        nextUrl.pathname.startsWith('/design-md');
 
-      if (!isLoggedIn && !isLoginPage) {
+      if (!isLoggedIn && !isPublicPage) {
         return false;
       }
 
-      if (isLoggedIn && isLoginPage) {
+      if (isLoggedIn && nextUrl.pathname.startsWith('/login')) {
         return Response.redirect(new URL('/', nextUrl));
       }
 

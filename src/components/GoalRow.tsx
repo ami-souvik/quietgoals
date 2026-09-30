@@ -21,7 +21,7 @@ interface GoalRowProps {
   dragControls?: DragControls;
 }
 
-function PriorityIndicator({
+export function PriorityIndicator({
   priority,
   onClick,
   disabled,
