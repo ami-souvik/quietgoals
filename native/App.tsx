@@ -71,14 +71,18 @@ function MainApp() {
   );
 }
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 export default function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
-        <CreatorProvider>
-          <MainApp />
-        </CreatorProvider>
-      </ToastProvider>
-    </AppProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppProvider>
+        <ToastProvider>
+          <CreatorProvider>
+            <MainApp />
+          </CreatorProvider>
+        </ToastProvider>
+      </AppProvider>
+    </GestureHandlerRootView>
   );
 }

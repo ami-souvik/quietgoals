@@ -122,6 +122,9 @@ export const goals = sqliteTable(
     priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] })
       .notNull()
       .default('none'),
+    isPinned: integer('is_pinned', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     position: text('position').notNull(),
     createdAt: text('created_at')
       .notNull()

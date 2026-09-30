@@ -17,6 +17,7 @@ const CreateGoalSchema = z.object({
     .max(200, 'Title must be 200 characters or fewer'),
   afterPosition: z.string().optional().nullable(),
   position: z.string().optional(),
+  isPinned: z.boolean().optional(),
 });
 
 export type CreateGoalInput = z.infer<typeof CreateGoalSchema>;
@@ -33,7 +34,7 @@ export async function createGoal(input: CreateGoalInput) {
     };
   }
 
-  const { id, title, afterPosition, position } = validated.data;
+  const { id, title, afterPosition, position, isPinned } = validated.data;
   const finalPosition = position ?? generateKeyBetween(afterPosition ?? null, null);
 
   try {
@@ -53,6 +54,7 @@ export async function createGoal(input: CreateGoalInput) {
       position: finalPosition,
       status: 'active',
       priority: 'none',
+      isPinned: isPinned ?? false,
     });
 
     revalidatePath('/');
@@ -74,6 +76,7 @@ const UpdateGoalSchema = z.object({
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   status: z.enum(['active', 'completed', 'killed']).optional(),
   position: z.string().optional(),
+  isPinned: z.boolean().optional(),
 });
 
 export type UpdateGoalInput = z.infer<typeof UpdateGoalSchema>;
@@ -90,7 +93,7 @@ export async function updateGoal(input: UpdateGoalInput) {
     };
   }
 
-  const { id, title, priority, status, position } = validated.data;
+  const { id, title, priority, status, position, isPinned } = validated.data;
 
   try {
     const [existing] = await db
@@ -107,8 +110,9 @@ export async function updateGoal(input: UpdateGoalInput) {
     const hasPriorityChange = priority !== undefined && priority !== existing.priority;
     const hasStatusChange = status !== undefined && status !== existing.status;
     const hasPositionChange = position !== undefined && position !== existing.position;
+    const hasIsPinnedChange = isPinned !== undefined && isPinned !== existing.isPinned;
 
-    if (!hasTitleChange && !hasPriorityChange && !hasStatusChange && !hasPositionChange) {
+    if (!hasTitleChange && !hasPriorityChange && !hasStatusChange && !hasPositionChange && !hasIsPinnedChange) {
       return { success: true, noop: true };
     }
 
@@ -120,6 +124,7 @@ export async function updateGoal(input: UpdateGoalInput) {
     if (hasTitleChange) updateValues.title = title;
     if (hasPriorityChange) updateValues.priority = priority;
     if (hasPositionChange) updateValues.position = position;
+    if (hasIsPinnedChange) updateValues.isPinned = isPinned;
     if (hasStatusChange) {
       updateValues.status = status;
       if (status === 'completed' || status === 'killed') {

@@ -23,6 +23,8 @@ import { updateWidget } from '../lib/widget';
 import { TemplateType, MoodType, BgMode, ToolType } from '../lib/types';
 import { useAppContext } from './AppContext';
 import { useToast } from './ToastContext';
+import { useSession } from '../lib/auth-client';
+import { playSound } from '../lib/sound';
 
 interface CreatorContextType {
     // Current simple state (templates) - might be removed later if completely unused, but leaving for safety
@@ -66,6 +68,7 @@ interface CreatorContextType {
     toggleTaskCompletion: (id: string) => Promise<void>;
     toggleTaskPin: (id: string) => Promise<void>;
     deleteTask: (id: string) => Promise<void>;
+    reorderTasks: (data: TodoItem[], from: number, to: number) => Promise<void>;
 
     // Overlay State
     isOverlayOpen: boolean;
@@ -100,6 +103,10 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const [activeGoal, setActiveGoal] = useState<ActiveGoal | null>(null);
     const [history, setHistory] = useState<ActiveGoal[]>([]);
+    
+    const { data: session } = useSession();
+    
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
     // Core inputs
     const [text, setText] = useState('Quiet Goals');
@@ -155,6 +162,33 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         init();
     }, []);
 
+    // Sync from server when session changes
+    useEffect(() => {
+        if (session) {
+            fetch(`${API_URL}/api/goals`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.activeGoals) {
+                        // Map remote goals to TodoItem format for now
+                        const remoteTasks: TodoItem[] = data.activeGoals.map((g: any) => ({
+                            id: g.id,
+                            text: g.title,
+                            title: g.title,
+                            completed: false,
+                            status: g.status,
+                            priority: g.priority,
+                            position: g.position,
+                            isPinned: g.isPinned,
+                            createdAt: g.createdAt,
+                        }));
+                        setAllTasks(remoteTasks);
+                        storageSaveTasks(remoteTasks);
+                    }
+                })
+                .catch(console.error);
+        }
+    }, [session, API_URL]);
+
     // Task Actions
     const syncPinnedTasksToGoal = async (tasks: TodoItem[]) => {
         const pinned = tasks.filter(t => t.isPinned && !t.completed);
@@ -169,15 +203,46 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const updated = [...newTasks, ...allTasks];
         setAllTasks(updated);
         await storageSaveTasks(updated);
+        
+        if (session) {
+            for (const task of newTasks) {
+                fetch(`${API_URL}/api/goals`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: task.id,
+                        title: task.text,
+                        isPinned: task.isPinned
+                    })
+                }).catch(console.error);
+            }
+        }
+        
         if (newTasks.some(t => t.isPinned)) {
             await syncPinnedTasksToGoal(updated);
         }
+        playSound('create');
     };
 
     const updateTask = async (id: string, updates: Partial<TodoItem>) => {
         const updated = allTasks.map(t => t.id === id ? { ...t, ...updates } : t);
         setAllTasks(updated);
         await storageSaveTasks(updated);
+        
+        if (session) {
+            fetch(`${API_URL}/api/goals/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: updates.title || updates.text,
+                    isPinned: updates.isPinned,
+                    status: updates.status,
+                    priority: updates.priority
+                })
+            }).catch(console.error);
+        }
+        
+        playSound('save');
         await syncPinnedTasksToGoal(updated);
     };
 
@@ -195,12 +260,40 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const toggleTaskCompletion = async (id: string) => {
         const updated = allTasks.map(t => {
             if (t.id === id) {
-                return { ...t, completed: !t.completed, isPinned: false }; // Unpin on complete
+                const isArchived = t.status === 'completed' || t.status === 'killed' || t.completed;
+                if (isArchived) {
+                    // Restore to active
+                    return { ...t, completed: false, status: 'active', isPinned: false };
+                } else {
+                    // Mark as completed
+                    return { ...t, completed: true, status: 'completed', isPinned: false };
+                }
             }
             return t;
         });
         setAllTasks(updated);
         await storageSaveTasks(updated);
+        
+        if (session) {
+            const task = updated.find(t => t.id === id);
+            if (task) {
+                fetch(`${API_URL}/api/goals/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: task.status, isPinned: false })
+                }).catch(console.error);
+            }
+        }
+        
+        const toggledTask = updated.find(t => t.id === id);
+        if (toggledTask) {
+            if (toggledTask.status === 'completed') {
+                playSound('complete');
+            } else if (toggledTask.status === 'active') {
+                playSound('restore');
+            }
+        }
+        
         await syncPinnedTasksToGoal(updated);
     };
 
@@ -208,11 +301,22 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const updated = allTasks.map(t => t.id === id ? { ...t, isPinned: willPin } : t);
         setAllTasks(updated);
         await storageSaveTasks(updated);
+        
+        if (session) {
+            fetch(`${API_URL}/api/goals/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isPinned: willPin })
+            }).catch(console.error);
+        }
+        
         await syncPinnedTasksToGoal(updated);
 
         if (willPin) {
+            playSound('priority');
             showToast('Task pinned!', 'success');
         } else {
+            playSound('keyTick');
             showToast('Task unpinned.', 'success');
         }
         if (!skipWallpaperUpdate && hasAcceptedPinWarning) {
@@ -257,6 +361,15 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const updated = allTasks.map(t => t.id === taskToPin ? { ...t, isPinned: true } : t);
             setAllTasks(updated);
             await storageSaveTasks(updated);
+            
+            if (session) {
+                fetch(`${API_URL}/api/goals/${taskToPin}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isPinned: true })
+                }).catch(console.error);
+            }
+            
             await syncPinnedTasksToGoal(updated);
 
             showToast('Task pinned!', 'success');
@@ -270,10 +383,45 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const deleteTask = async (id: string) => {
-        const updated = allTasks.filter(t => t.id !== id);
-        setAllTasks(updated);
-        await storageSaveTasks(updated);
-        await syncPinnedTasksToGoal(updated);
+        const task = allTasks.find(t => t.id === id);
+        if (!task) return;
+
+        const isArchived = task.status === 'completed' || task.status === 'killed' || task.completed;
+
+        if (isArchived) {
+            // Hard delete
+            const updated = allTasks.filter(t => t.id !== id);
+            setAllTasks(updated);
+            await storageSaveTasks(updated);
+            
+            if (session) {
+                fetch(`${API_URL}/api/goals/${id}`, {
+                    method: 'DELETE',
+                }).catch(console.error);
+            }
+            playSound('kill');
+            await syncPinnedTasksToGoal(updated);
+        } else {
+            // Soft delete (kill)
+            const updated = allTasks.map(t => {
+                if (t.id === id) {
+                    return { ...t, status: 'killed', isPinned: false };
+                }
+                return t;
+            });
+            setAllTasks(updated);
+            await storageSaveTasks(updated);
+            
+            if (session) {
+                fetch(`${API_URL}/api/goals/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'killed', isPinned: false })
+                }).catch(console.error);
+            }
+            playSound('kill');
+            await syncPinnedTasksToGoal(updated);
+        }
     };
 
     const persist = (key: string, fn: (arg: any) => void) => (value: any) => {
@@ -391,6 +539,29 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setHistory(prev => prev.filter(h => h.timestamp !== timestamp));
     };
 
+    const reorderTasks = async (data: TodoItem[], from: number, to: number) => {
+        setAllTasks(data);
+        await storageSaveTasks(data);
+        
+        if (session) {
+            const movedTask = data[to];
+            const beforeTask = to > 0 ? data[to - 1] : null;
+            const afterTask = to < data.length - 1 ? data[to + 1] : null;
+            
+            fetch(`${API_URL}/api/goals/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: movedTask.id,
+                    beforeId: beforeTask?.id || null,
+                    afterId: afterTask?.id || null
+                })
+            }).catch(console.error);
+        }
+        
+        await syncPinnedTasksToGoal(data);
+    };
+
     return (
         <CreatorContext.Provider
             value={{
@@ -407,7 +578,7 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 activeGoal,
                 history,
                 todoItems, setTodoItems,
-                allTasks, addTasks, updateTask, toggleTaskCompletion, toggleTaskPin, deleteTask,
+                allTasks, addTasks, updateTask, toggleTaskCompletion, toggleTaskPin, deleteTask, reorderTasks,
                 isOverlayOpen, editingTask, openOverlay, closeOverlay,
                 isPinWarningVisible, hidePinWarning, handlePinWarningAccept,
                 viewShotRef,

@@ -39,8 +39,8 @@ export const metadata: Metadata = {
   title: 'quiet goals',
   description: 'A single-list, keyboard-first, unapologetically minimal goals app.',
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/icon.png',
+    apple: '/icon.png',
   },
   appleWebApp: {
     capable: true,

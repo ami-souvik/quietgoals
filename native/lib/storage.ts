@@ -4,11 +4,15 @@ import { MoodType, BgMode } from './types';
 
 export interface TodoItem {
   id: string;
-  text: string;
-  completed: boolean;
+  text: string; // Legacy, map to title
+  title?: string;
+  completed: boolean; // Legacy, map to status
+  status?: 'active' | 'completed' | 'killed';
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  position?: string;
   project?: string;
   isPinned?: boolean;
-  createdAt?: number;
+  createdAt?: number | string;
 }
 
 export interface ActiveGoal {
