@@ -492,6 +492,7 @@ export function GoalList({
       const optimisticGoal: Goal = {
         id,
         userId: optimisticGoals[0]?.userId ?? 'user',
+        userEmail: user?.email ?? null,
         title: trimmed,
         status: 'active',
         priority: 'none',

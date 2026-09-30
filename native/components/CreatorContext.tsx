@@ -14,6 +14,7 @@ import {
     saveActiveGoal,
     getTasks,
     saveTasks as storageSaveTasks,
+    migrateGuestTasksToUser,
     getPinWarningAccepted,
     setPinWarningAccepted,
     setWallpaperCustomization,
@@ -25,6 +26,7 @@ import { useAppContext } from './AppContext';
 import { useToast } from './ToastContext';
 import { useSession } from '../lib/auth-client';
 import { playSound } from '../lib/sound';
+import { authenticatedFetch } from '../lib/api';
 
 interface CreatorContextType {
     // Current simple state (templates) - might be removed later if completely unused, but leaving for safety
@@ -137,81 +139,141 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const viewShotRef = useRef<any>(null);
 
-    useEffect(() => {
-        const init = async () => {
-            const goal = await getActiveGoal();
-            if (goal) {
-                setActiveGoal(goal);
-                updateWidget(JSON.stringify(goal));
-            }
-            const hist = await getHistory();
-            setHistory(hist);
-            const tasks = await getTasks();
-            setAllTasks(tasks);
-            const warningAccepted = await getPinWarningAccepted();
-            const pinnedTasks = tasks.filter(t => t.isPinned);
-            setHasAcceptedPinWarning(warningAccepted || pinnedTasks.length > 0);
-            const wallpaperCustomization = await getWallpaperCustomization();
-            if (wallpaperCustomization.moodId) setMoodId(wallpaperCustomization.moodId);
-            if (wallpaperCustomization.variantId) setVariantId(wallpaperCustomization.variantId);
-            if (wallpaperCustomization.fontSizeScale) setFontSizeScale(wallpaperCustomization.fontSizeScale);
-            if (wallpaperCustomization.isBold) setIsBold(wallpaperCustomization.isBold);
-            if (wallpaperCustomization.bgMode) setBgMode(wallpaperCustomization.bgMode);
-            if (wallpaperCustomization.backgroundImage) setBackgroundImage(wallpaperCustomization.backgroundImage);
-        };
-        init();
-    }, []);
+    const userEmail = session?.user?.email ?? null;
 
-    // Sync from server when session changes
     useEffect(() => {
-        if (session) {
-            fetch(`${API_URL}/api/goals`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.activeGoals) {
-                        // Map remote goals to TodoItem format for now
-                        const remoteTasks: TodoItem[] = data.activeGoals.map((g: any) => ({
-                            id: g.id,
-                            text: g.title,
-                            title: g.title,
-                            completed: false,
-                            status: g.status,
-                            priority: g.priority,
-                            position: g.position,
-                            isPinned: g.isPinned,
-                            createdAt: g.createdAt,
-                        }));
-                        setAllTasks(remoteTasks);
-                        storageSaveTasks(remoteTasks);
+        let isCancelled = false;
+
+        const loadContextForUser = async () => {
+            // First load wallpaper customizations (device level)
+            const wallpaperCustomization = await getWallpaperCustomization();
+            if (!isCancelled) {
+                if (wallpaperCustomization.moodId) setMoodId(wallpaperCustomization.moodId);
+                if (wallpaperCustomization.variantId) setVariantId(wallpaperCustomization.variantId);
+                if (wallpaperCustomization.fontSizeScale) setFontSizeScale(wallpaperCustomization.fontSizeScale);
+                if (wallpaperCustomization.isBold) setIsBold(wallpaperCustomization.isBold);
+                if (wallpaperCustomization.bgMode) setBgMode(wallpaperCustomization.bgMode);
+                if (wallpaperCustomization.backgroundImage) setBackgroundImage(wallpaperCustomization.backgroundImage);
+            }
+
+            if (userEmail) {
+                // 1. Automatically migrate offline/guest tasks into this signed-in email account
+                const migratedTasks = await migrateGuestTasksToUser(userEmail);
+
+                // 2. Load cached tasks, goal, and history for this user's email
+                const localTasks = await getTasks(userEmail);
+                if (!isCancelled) {
+                    setAllTasks(localTasks);
+                    const pinnedTasks = localTasks.filter(t => t.isPinned);
+                    const warningAccepted = await getPinWarningAccepted();
+                    setHasAcceptedPinWarning(warningAccepted || pinnedTasks.length > 0);
+                }
+
+                const goal = await getActiveGoal(userEmail);
+                if (!isCancelled && goal) {
+                    setActiveGoal(goal);
+                    updateWidget(JSON.stringify(goal));
+                }
+
+                const hist = await getHistory(userEmail);
+                if (!isCancelled) {
+                    setHistory(hist);
+                }
+
+                // 3. Fetch remote goals from server for this user
+                try {
+                    const res = await authenticatedFetch('/api/goals');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.activeGoals && !isCancelled) {
+                            const remoteTasks: TodoItem[] = data.activeGoals.map((g: any) => ({
+                                id: g.id,
+                                text: g.title,
+                                title: g.title,
+                                completed: false,
+                                status: g.status as 'active' | 'completed' | 'killed',
+                                priority: g.priority,
+                                position: g.position,
+                                isPinned: g.isPinned,
+                                createdAt: g.createdAt,
+                            }));
+
+                            // If we had migrated guest tasks not yet on server, upload them
+                            const remoteIds = new Set(remoteTasks.map(t => t.id));
+                            const localOnly = (migratedTasks.length > 0 ? migratedTasks : localTasks).filter(t => !remoteIds.has(t.id));
+
+                            if (localOnly.length > 0) {
+                                await authenticatedFetch('/api/goals/sync', {
+                                    method: 'POST',
+                                    body: JSON.stringify({
+                                        offlineTasks: localOnly.map(t => ({
+                                            id: t.id,
+                                            title: t.text || t.title || 'Untitled',
+                                            status: t.status || (t.completed ? 'completed' : 'active'),
+                                            createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+                                        }))
+                                    })
+                                }).catch(console.error);
+                            }
+
+                            const combined = [...localOnly, ...remoteTasks];
+                            setAllTasks(combined);
+                            await storageSaveTasks(combined, userEmail);
+                        }
                     }
-                })
-                .catch(console.error);
-        }
-    }, [session, API_URL]);
+                } catch (err) {
+                    console.warn('[Sync] Could not sync remote goals:', err);
+                }
+            } else {
+                // Guest mode (logged out)
+                const guestTasks = await getTasks(null);
+                if (!isCancelled) {
+                    setAllTasks(guestTasks);
+                    const pinnedTasks = guestTasks.filter(t => t.isPinned);
+                    const warningAccepted = await getPinWarningAccepted();
+                    setHasAcceptedPinWarning(warningAccepted || pinnedTasks.length > 0);
+                }
+                const guestGoal = await getActiveGoal(null);
+                if (!isCancelled) {
+                    setActiveGoal(guestGoal);
+                    if (guestGoal) updateWidget(JSON.stringify(guestGoal));
+                }
+                const guestHist = await getHistory(null);
+                if (!isCancelled) {
+                    setHistory(guestHist);
+                }
+            }
+        };
+
+        loadContextForUser();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [userEmail]);
 
     // Task Actions
     const syncPinnedTasksToGoal = async (tasks: TodoItem[]) => {
         const pinned = tasks.filter(t => t.isPinned && !t.completed);
         const firstTask = pinned[0]?.text || 'My Tasks';
         const newGoal: ActiveGoal = { type: 'todo', text: firstTask, todoItems: pinned, timestamp: Date.now() };
-        await saveActiveGoal(newGoal);
+        await saveActiveGoal(newGoal, userEmail);
         setActiveGoal(newGoal);
-        setHistory(await getHistory());
+        setHistory(await getHistory(userEmail));
     };
 
     const addTasks = async (newTasks: TodoItem[]) => {
         const updated = [...newTasks, ...allTasks];
         setAllTasks(updated);
-        await storageSaveTasks(updated);
+        await storageSaveTasks(updated, userEmail);
         
         if (session) {
             for (const task of newTasks) {
-                fetch(`${API_URL}/api/goals`, {
+                authenticatedFetch('/api/goals', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         id: task.id,
-                        title: task.text,
+                        title: task.text || task.title,
                         isPinned: task.isPinned
                     })
                 }).catch(console.error);
@@ -227,12 +289,11 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updateTask = async (id: string, updates: Partial<TodoItem>) => {
         const updated = allTasks.map(t => t.id === id ? { ...t, ...updates } : t);
         setAllTasks(updated);
-        await storageSaveTasks(updated);
+        await storageSaveTasks(updated, userEmail);
         
         if (session) {
-            fetch(`${API_URL}/api/goals/${id}`, {
+            authenticatedFetch(`/api/goals/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title: updates.title || updates.text,
                     isPinned: updates.isPinned,
@@ -258,28 +319,27 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const toggleTaskCompletion = async (id: string) => {
-        const updated = allTasks.map(t => {
+        const updated: TodoItem[] = allTasks.map(t => {
             if (t.id === id) {
                 const isArchived = t.status === 'completed' || t.status === 'killed' || t.completed;
                 if (isArchived) {
                     // Restore to active
-                    return { ...t, completed: false, status: 'active', isPinned: false };
+                    return { ...t, completed: false, status: 'active' as const, isPinned: false };
                 } else {
                     // Mark as completed
-                    return { ...t, completed: true, status: 'completed', isPinned: false };
+                    return { ...t, completed: true, status: 'completed' as const, isPinned: false };
                 }
             }
             return t;
         });
         setAllTasks(updated);
-        await storageSaveTasks(updated);
+        await storageSaveTasks(updated, userEmail);
         
         if (session) {
             const task = updated.find(t => t.id === id);
             if (task) {
-                fetch(`${API_URL}/api/goals/${id}`, {
+                authenticatedFetch(`/api/goals/${id}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: task.status, isPinned: false })
                 }).catch(console.error);
             }
@@ -300,12 +360,11 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const executePin = async (id: string, willPin: boolean, skipWallpaperUpdate = false) => {
         const updated = allTasks.map(t => t.id === id ? { ...t, isPinned: willPin } : t);
         setAllTasks(updated);
-        await storageSaveTasks(updated);
+        await storageSaveTasks(updated, userEmail);
         
         if (session) {
-            fetch(`${API_URL}/api/goals/${id}`, {
+            authenticatedFetch(`/api/goals/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isPinned: willPin })
             }).catch(console.error);
         }
@@ -360,12 +419,11 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (taskToPin) {
             const updated = allTasks.map(t => t.id === taskToPin ? { ...t, isPinned: true } : t);
             setAllTasks(updated);
-            await storageSaveTasks(updated);
+            await storageSaveTasks(updated, userEmail);
             
             if (session) {
-                fetch(`${API_URL}/api/goals/${taskToPin}`, {
+                authenticatedFetch(`/api/goals/${taskToPin}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ isPinned: true })
                 }).catch(console.error);
             }
@@ -392,10 +450,10 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
             // Hard delete
             const updated = allTasks.filter(t => t.id !== id);
             setAllTasks(updated);
-            await storageSaveTasks(updated);
+            await storageSaveTasks(updated, userEmail);
             
             if (session) {
-                fetch(`${API_URL}/api/goals/${id}`, {
+                authenticatedFetch(`/api/goals/${id}`, {
                     method: 'DELETE',
                 }).catch(console.error);
             }
@@ -403,19 +461,18 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await syncPinnedTasksToGoal(updated);
         } else {
             // Soft delete (kill)
-            const updated = allTasks.map(t => {
+            const updated: TodoItem[] = allTasks.map(t => {
                 if (t.id === id) {
-                    return { ...t, status: 'killed', isPinned: false };
+                    return { ...t, status: 'killed' as const, isPinned: false };
                 }
                 return t;
             });
             setAllTasks(updated);
-            await storageSaveTasks(updated);
+            await storageSaveTasks(updated, userEmail);
             
             if (session) {
-                fetch(`${API_URL}/api/goals/${id}`, {
+                authenticatedFetch(`/api/goals/${id}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: 'killed', isPinned: false })
                 }).catch(console.error);
             }
@@ -528,29 +585,28 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const saveTodoGoal = async () => {
         const firstTask = todoItems[0]?.text || 'My Tasks';
         const newGoal: ActiveGoal = { type: 'todo', text: firstTask, todoItems, timestamp: Date.now() };
-        await saveActiveGoal(newGoal);
+        await saveActiveGoal(newGoal, userEmail);
         setActiveGoal(newGoal);
-        setHistory(await getHistory());
+        setHistory(await getHistory(userEmail));
         showToast('Tasks saved and active!', 'success');
     };
 
     const deleteFromHistory = async (timestamp: number) => {
-        await removeFromHistory(timestamp);
+        await removeFromHistory(timestamp, userEmail);
         setHistory(prev => prev.filter(h => h.timestamp !== timestamp));
     };
 
     const reorderTasks = async (data: TodoItem[], from: number, to: number) => {
         setAllTasks(data);
-        await storageSaveTasks(data);
+        await storageSaveTasks(data, userEmail);
         
         if (session) {
             const movedTask = data[to];
             const beforeTask = to > 0 ? data[to - 1] : null;
             const afterTask = to < data.length - 1 ? data[to + 1] : null;
             
-            fetch(`${API_URL}/api/goals/move`, {
+            authenticatedFetch('/api/goals/move', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: movedTask.id,
                     beforeId: beforeTask?.id || null,

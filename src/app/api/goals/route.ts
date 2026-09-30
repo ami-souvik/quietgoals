@@ -8,8 +8,8 @@ export async function GET() {
   try {
     const user = await requireUser();
     const [activeGoals, archivedGoals] = await Promise.all([
-      listActiveGoals(user.id),
-      listArchivedGoals(user.id),
+      listActiveGoals(user.id, user.email),
+      listArchivedGoals(user.id, user.email),
     ]);
 
     return NextResponse.json({

@@ -1,22 +1,30 @@
 import { db } from '@/lib/db';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { goals, type Goal, type GoalPriority } from './schema';
 
-export async function listActiveGoals(userId: string): Promise<Goal[]> {
+export async function listActiveGoals(userId: string, userEmail?: string): Promise<Goal[]> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   return db
     .select()
     .from(goals)
-    .where(and(eq(goals.userId, userId), eq(goals.status, 'active')))
+    .where(and(userCondition, eq(goals.status, 'active')))
     .orderBy(asc(goals.position));
 }
 
-export async function listArchivedGoals(userId: string): Promise<Goal[]> {
+export async function listArchivedGoals(userId: string, userEmail?: string): Promise<Goal[]> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   return db
     .select()
     .from(goals)
     .where(
       and(
-        eq(goals.userId, userId),
+        userCondition,
         inArray(goals.status, ['completed', 'killed']),
       ),
     )
@@ -29,12 +37,14 @@ export async function createGoal(
     title: string;
     position: string;
     priority?: GoalPriority;
+    userEmail?: string;
   },
 ): Promise<Goal> {
   const [created] = await db
     .insert(goals)
     .values({
       userId,
+      userEmail: input.userEmail,
       title: input.title,
       position: input.position,
       priority: input.priority ?? 'none',

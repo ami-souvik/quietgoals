@@ -26,19 +26,22 @@ export const SettingsView: React.FC = () => {
             const syncOfflineData = async () => {
                 setSyncing(true);
                 try {
-                    const { getTasks, saveTasks } = require('../../lib/storage');
-                    const tasks = await getTasks();
+                    const { getTasks, migrateGuestTasksToUser } = require('../../lib/storage');
+                    const { authenticatedFetch } = require('../../lib/api');
+                    await migrateGuestTasksToUser(session.user.email);
+                    const tasks = await getTasks(session.user.email);
                     if (tasks && tasks.length > 0) {
-                        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-                        const response = await fetch(`${baseUrl}/api/goals/sync`, {
+                        await authenticatedFetch('/api/goals/sync', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ offlineTasks: tasks })
+                            body: JSON.stringify({
+                                offlineTasks: tasks.map((t: any) => ({
+                                    id: t.id,
+                                    title: t.text || t.title || 'Untitled',
+                                    status: t.status || (t.completed ? 'completed' : 'active'),
+                                    createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+                                }))
+                            })
                         });
-                        if (response.ok) {
-                            // Clear offline tasks once synced successfully
-                            await saveTasks([]);
-                        }
                     }
                 } catch (error) {
                     console.error('Failed to sync offline tasks:', error);

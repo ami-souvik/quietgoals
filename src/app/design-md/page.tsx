@@ -17,6 +17,7 @@ export default function DesignMdPage() {
   const sampleGoal: Goal = {
     id: '1',
     userId: 'test',
+    userEmail: 'test@example.com',
     title: 'Sample Goal Title',
     status: 'active',
     priority: priority,

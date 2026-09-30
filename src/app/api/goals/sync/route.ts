@@ -56,6 +56,7 @@ export async function POST(request: Request) {
           newTasks.map((t, idx) => ({
             id: t.id,
             userId: user.id,
+            userEmail: user.email,
             title: t.title,
             position: newKeys[idx],
             status: t.status,

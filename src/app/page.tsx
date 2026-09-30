@@ -6,8 +6,8 @@ import { requireUser } from '@/lib/auth';
 export default async function HomePage() {
   const user = await requireUser();
   const [activeGoals, archivedGoals, cookieStore] = await Promise.all([
-    listActiveGoals(user.id),
-    listArchivedGoals(user.id),
+    listActiveGoals(user.id, user.email),
+    listArchivedGoals(user.id, user.email),
     cookies(),
   ]);
 

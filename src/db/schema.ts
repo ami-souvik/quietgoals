@@ -115,6 +115,7 @@ export const goals = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    userEmail: text('user_email'),
     title: text('title').notNull(),
     status: text('status', { enum: ['active', 'completed', 'killed'] })
       .notNull()
@@ -143,6 +144,11 @@ export const goals = sqliteTable(
     index('goals_user_id_archived_at_idx').on(
       table.userId,
       table.archivedAt,
+    ),
+    index('goals_user_email_status_position_idx').on(
+      table.userEmail,
+      table.status,
+      table.position,
     ),
   ],
 );

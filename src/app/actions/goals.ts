@@ -50,6 +50,7 @@ export async function createGoal(input: CreateGoalInput) {
     await db.insert(goals).values({
       id,
       userId: user.id,
+      userEmail: user.email,
       title,
       position: finalPosition,
       status: 'active',

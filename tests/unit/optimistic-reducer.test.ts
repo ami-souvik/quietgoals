@@ -7,6 +7,7 @@ function makeGoal(id: string, title: string, position: string): Goal {
   return {
     id,
     userId: 'user_123',
+    userEmail: 'user@example.com',
     title,
     status: 'active',
     priority: 'none',
