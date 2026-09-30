@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, verifyBearerToken } from '@/lib/agentTokens';
 import { db } from '@/lib/db';
-import { goals, type GoalPriority, type GoalStatus } from '@/db/schema';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { goals, user, type GoalPriority, type GoalStatus } from '@/db/schema';
+import { and, asc, desc, eq, or } from 'drizzle-orm';
 import { generateKeyBetween } from 'fractional-indexing';
 
 interface JsonRpcRequest {
@@ -144,9 +144,14 @@ const TOOLS_MANIFEST = [
 
 async function handleToolCall(
   userId: string,
+  userEmail: string | null,
   toolName: string,
   args: Record<string, unknown> = {}
 ) {
+  const userScope = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   switch (toolName) {
     case 'list_goals': {
       const requestedStatus = (args.status as string) || 'active';
@@ -155,7 +160,7 @@ async function handleToolCall(
         ? requestedStatus
         : 'active';
 
-      const query = db.select().from(goals).where(eq(goals.userId, userId));
+      const query = db.select().from(goals).where(userScope);
       let rows;
 
       if (statusFilter === 'all') {
@@ -166,7 +171,7 @@ async function handleToolCall(
           .from(goals)
           .where(
             and(
-              eq(goals.userId, userId),
+              userScope,
               eq(goals.status, statusFilter as GoalStatus)
             )
           )
@@ -205,7 +210,7 @@ async function handleToolCall(
       const [lastActive] = await db
         .select({ position: goals.position })
         .from(goals)
-        .where(and(eq(goals.userId, userId), eq(goals.status, 'active')))
+        .where(and(userScope, eq(goals.status, 'active')))
         .orderBy(desc(goals.position))
         .limit(1);
 
@@ -216,6 +221,7 @@ async function handleToolCall(
       await db.insert(goals).values({
         id: goalId,
         userId,
+        userEmail: userEmail ?? null,
         title: rawTitle,
         status: 'active',
         priority,
@@ -246,7 +252,7 @@ async function handleToolCall(
       const [existing] = await db
         .select()
         .from(goals)
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+        .where(and(eq(goals.id, id), userScope))
         .limit(1);
 
       if (!existing) {
@@ -275,7 +281,7 @@ async function handleToolCall(
       await db
         .update(goals)
         .set(updates)
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+        .where(and(eq(goals.id, id), userScope));
 
       return {
         success: true,
@@ -293,7 +299,7 @@ async function handleToolCall(
       const [existing] = await db
         .select()
         .from(goals)
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+        .where(and(eq(goals.id, id), userScope))
         .limit(1);
 
       if (!existing) {
@@ -308,7 +314,7 @@ async function handleToolCall(
           archivedAt: now,
           updatedAt: now,
         })
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+        .where(and(eq(goals.id, id), userScope));
 
       return {
         success: true,
@@ -325,7 +331,7 @@ async function handleToolCall(
       const [existing] = await db
         .select()
         .from(goals)
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+        .where(and(eq(goals.id, id), userScope))
         .limit(1);
 
       if (!existing) {
@@ -340,7 +346,7 @@ async function handleToolCall(
           archivedAt: now,
           updatedAt: now,
         })
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+        .where(and(eq(goals.id, id), userScope));
 
       return {
         success: true,
@@ -357,7 +363,7 @@ async function handleToolCall(
       const [existing] = await db
         .select()
         .from(goals)
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+        .where(and(eq(goals.id, id), userScope))
         .limit(1);
 
       if (!existing) {
@@ -368,7 +374,7 @@ async function handleToolCall(
       const [lastActive] = await db
         .select({ position: goals.position })
         .from(goals)
-        .where(and(eq(goals.userId, userId), eq(goals.status, 'active')))
+        .where(and(userScope, eq(goals.status, 'active')))
         .orderBy(desc(goals.position))
         .limit(1);
 
@@ -383,7 +389,7 @@ async function handleToolCall(
           archivedAt: null,
           updatedAt: now,
         })
-        .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+        .where(and(eq(goals.id, id), userScope));
 
       return {
         success: true,
@@ -400,6 +406,7 @@ async function handleToolCall(
 
 async function processRpcMessage(
   userId: string,
+  userEmail: string | null,
   req: JsonRpcRequest
 ): Promise<unknown> {
   const { id, method, params } = req;
@@ -441,7 +448,7 @@ async function processRpcMessage(
       }
 
       try {
-        const result = await handleToolCall(userId, name, args);
+        const result = await handleToolCall(userId, userEmail, name, args);
         return jsonRpcSuccess(id, {
           content: [
             {
@@ -566,18 +573,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Look up user email for dual-scope data isolation
+  const [userRecord] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, auth.userId))
+    .limit(1);
+  const userEmail = userRecord?.email ?? null;
+
   const acceptHeader = request.headers.get('accept') || '';
   const isStreamRequest = acceptHeader.includes('text/event-stream');
 
   // Handle single request or batch requests
   if (Array.isArray(body)) {
     const responses = await Promise.all(
-      body.map((item) => processRpcMessage(auth.userId!, item as JsonRpcRequest))
+      body.map((item) => processRpcMessage(auth.userId!, userEmail, item as JsonRpcRequest))
     );
     return NextResponse.json(responses);
   }
 
-  const response = await processRpcMessage(auth.userId, body as JsonRpcRequest);
+  const response = await processRpcMessage(auth.userId, userEmail, body as JsonRpcRequest);
 
   if (isStreamRequest) {
     const encoder = new TextEncoder();

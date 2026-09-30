@@ -62,14 +62,19 @@ export async function updateGoal(
     title?: string;
     priority?: GoalPriority;
   },
+  userEmail?: string,
 ): Promise<Goal | undefined> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   const [updated] = await db
     .update(goals)
     .set({
       ...input,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+    .where(and(eq(goals.id, id), userCondition))
     .returning();
 
   return updated;
@@ -79,14 +84,19 @@ export async function moveGoal(
   userId: string,
   id: string,
   newPosition: string,
+  userEmail?: string,
 ): Promise<Goal | undefined> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   const [moved] = await db
     .update(goals)
     .set({
       position: newPosition,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+    .where(and(eq(goals.id, id), userCondition))
     .returning();
 
   return moved;
@@ -96,7 +106,12 @@ export async function archiveGoal(
   userId: string,
   id: string,
   status: 'completed' | 'killed',
+  userEmail?: string,
 ): Promise<Goal | undefined> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   const now = new Date().toISOString();
   const [archived] = await db
     .update(goals)
@@ -105,7 +120,7 @@ export async function archiveGoal(
       archivedAt: now,
       updatedAt: now,
     })
-    .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+    .where(and(eq(goals.id, id), userCondition))
     .returning();
 
   return archived;
@@ -115,7 +130,12 @@ export async function restoreGoal(
   userId: string,
   id: string,
   position: string,
+  userEmail?: string,
 ): Promise<Goal | undefined> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   const now = new Date().toISOString();
   const [restored] = await db
     .update(goals)
@@ -125,14 +145,18 @@ export async function restoreGoal(
       archivedAt: null,
       updatedAt: now,
     })
-    .where(and(eq(goals.id, id), eq(goals.userId, userId)))
+    .where(and(eq(goals.id, id), userCondition))
     .returning();
 
   return restored;
 }
 
-export async function deleteForever(userId: string, id: string): Promise<void> {
+export async function deleteForever(userId: string, id: string, userEmail?: string): Promise<void> {
+  const userCondition = userEmail
+    ? or(eq(goals.userId, userId), eq(goals.userEmail, userEmail))
+    : eq(goals.userId, userId);
+
   await db
     .delete(goals)
-    .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+    .where(and(eq(goals.id, id), userCondition));
 }

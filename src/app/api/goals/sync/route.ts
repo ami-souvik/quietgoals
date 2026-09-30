@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { goals } from '@/db/schema';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { generateNKeysBetween } from 'fractional-indexing';
 
@@ -19,7 +19,12 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
+    let user;
+    try {
+      user = await requireUser();
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     
     let body;
     try {
@@ -39,10 +44,11 @@ export async function POST(request: Request) {
       const taskIds = offlineTasks.map(t => t.id);
       
       // Find which ones already exist
+      const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
       const existing = await db
         .select({ id: goals.id })
         .from(goals)
-        .where(and(eq(goals.userId, user.id), inArray(goals.id, taskIds)));
+        .where(and(userScope, inArray(goals.id, taskIds)));
         
       const existingIds = new Set(existing.map(g => g.id));
       

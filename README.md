@@ -134,6 +134,17 @@ In your CI/CD pipeline, run `npm run db:migrate` as an isolated pre-deploy step 
 
 ---
 
+## 🤖 Agent Access & Model Context Protocol (MCP)
+
+Quiet Goals features a built-in **Model Context Protocol (MCP)** server (`/api/mcp`) allowing AI assistants (Claude Desktop, Cursor, Antigravity, Windsurf, etc.) to securely read and manage goals.
+
+- **Endpoint:** `/api/mcp` (Streamable HTTP / JSON-RPC 2.0)
+- **Authentication:** Personal API tokens (`Authorization: Bearer qg_live_...`) generated via **Account Menu → Agent Access**.
+- **Available Tools:** `list_goals`, `add_goal`, `update_goal`, `complete_goal`, `kill_goal`, `restore_goal`.
+- **Documentation:** For full client setup guides, cURL examples, and schema reference, see [docs/AGENT_ACCESS.md](docs/AGENT_ACCESS.md).
+
+---
+
 ## 🩺 Health Check Endpoint
 
 A lightweight health endpoint is available at `/api/health`:

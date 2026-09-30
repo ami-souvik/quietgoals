@@ -263,6 +263,18 @@ export function AgentSettingsModal({ isOpen, onClose }: AgentSettingsModalProps)
                   </div>
                 </div>
               )}
+
+              <div className="pt-1 flex items-center justify-between text-[11px] text-text-muted">
+                <span>Want to connect Claude, Cursor, or IDEs?</span>
+                <a
+                  href="/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gold hover:underline font-mono"
+                >
+                  View documentation →
+                </a>
+              </div>
             </div>
           </motion.div>
         </div>

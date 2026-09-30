@@ -3,7 +3,7 @@
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { goals } from '@/db/schema';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ne, or } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -37,11 +37,13 @@ export async function createGoal(input: CreateGoalInput) {
   const { id, title, afterPosition, position, isPinned } = validated.data;
   const finalPosition = position ?? generateKeyBetween(afterPosition ?? null, null);
 
+  const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
+
   try {
     const [existing] = await db
       .select({ id: goals.id })
       .from(goals)
-      .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
+      .where(and(eq(goals.id, id), userScope));
 
     if (existing) {
       return { success: true, noop: true };
@@ -96,11 +98,13 @@ export async function updateGoal(input: UpdateGoalInput) {
 
   const { id, title, priority, status, position, isPinned } = validated.data;
 
+  const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
+
   try {
     const [existing] = await db
       .select()
       .from(goals)
-      .where(and(eq(goals.id, id), eq(goals.userId, user.id)))
+      .where(and(eq(goals.id, id), userScope))
       .limit(1);
 
     if (!existing) {
@@ -138,7 +142,7 @@ export async function updateGoal(input: UpdateGoalInput) {
     await db
       .update(goals)
       .set(updateValues)
-      .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
+      .where(and(eq(goals.id, id), userScope));
 
     revalidatePath('/');
     return { success: true };
@@ -165,6 +169,7 @@ export async function moveGoal(input: MoveGoalInput) {
   }
 
   const { id, beforeId, afterId } = validated.data;
+  const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
 
   try {
     let beforePosition: string | null = null;
@@ -174,7 +179,7 @@ export async function moveGoal(input: MoveGoalInput) {
       const [beforeGoal] = await db
         .select({ position: goals.position })
         .from(goals)
-        .where(and(eq(goals.id, beforeId), eq(goals.userId, user.id)))
+        .where(and(eq(goals.id, beforeId), userScope))
         .limit(1);
       beforePosition = beforeGoal?.position ?? null;
     }
@@ -183,7 +188,7 @@ export async function moveGoal(input: MoveGoalInput) {
       const [afterGoal] = await db
         .select({ position: goals.position })
         .from(goals)
-        .where(and(eq(goals.id, afterId), eq(goals.userId, user.id)))
+        .where(and(eq(goals.id, afterId), userScope))
         .limit(1);
       afterPosition = afterGoal?.position ?? null;
     }
@@ -196,7 +201,7 @@ export async function moveGoal(input: MoveGoalInput) {
       .from(goals)
       .where(
         and(
-          eq(goals.userId, user.id),
+          userScope,
           eq(goals.status, 'active'),
           eq(goals.position, newPosition),
           ne(goals.id, id)
@@ -215,7 +220,7 @@ export async function moveGoal(input: MoveGoalInput) {
         const activeList = await tx
           .select({ id: goals.id })
           .from(goals)
-          .where(and(eq(goals.userId, user.id), eq(goals.status, 'active')))
+          .where(and(userScope, eq(goals.status, 'active')))
           .orderBy(asc(goals.position));
 
         const orderedIds = activeList.map((g) => g.id).filter((gId) => gId !== id);
@@ -233,7 +238,7 @@ export async function moveGoal(input: MoveGoalInput) {
           await tx
             .update(goals)
             .set({ position: newKeys[i], updatedAt: now })
-            .where(and(eq(goals.id, orderedIds[i]), eq(goals.userId, user.id)));
+            .where(and(eq(goals.id, orderedIds[i]), userScope));
 
           if (orderedIds[i] === id) {
             newPosition = newKeys[i];
@@ -247,7 +252,7 @@ export async function moveGoal(input: MoveGoalInput) {
           position: newPosition,
           updatedAt: new Date().toISOString(),
         })
-        .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
+        .where(and(eq(goals.id, id), userScope));
     }
 
     revalidatePath('/');
@@ -288,6 +293,7 @@ export async function restoreGoal(input: z.infer<typeof RestoreGoalSchema>) {
 
   const { id, position } = validated.data;
   const now = new Date().toISOString();
+  const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
 
   try {
     await db
@@ -298,7 +304,7 @@ export async function restoreGoal(input: z.infer<typeof RestoreGoalSchema>) {
         archivedAt: null,
         updatedAt: now,
       })
-      .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
+      .where(and(eq(goals.id, id), userScope));
 
     revalidatePath('/');
     return { success: true };
@@ -320,11 +326,12 @@ export async function deleteGoalForever(input: z.infer<typeof DeleteGoalForeverS
   }
 
   const { id } = validated.data;
+  const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
 
   try {
     await db
       .delete(goals)
-      .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
+      .where(and(eq(goals.id, id), userScope));
 
     revalidatePath('/');
     return { success: true };
