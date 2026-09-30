@@ -66,7 +66,6 @@ export const SettingsView: React.FC = () => {
                     provider: "google",
                     callbackURL: "quietgoals://",
                 });
-                
                 if (res?.error) {
                     showAlert("Sign In Error", res.error.message || "Failed to sign in with Google.");
                 }

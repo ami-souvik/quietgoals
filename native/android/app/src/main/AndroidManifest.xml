@@ -25,6 +25,25 @@
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
+      <!-- Deep link intent filter for quietgoals:// scheme (OAuth callback) -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="quietgoals"/>
+      </intent-filter>
+    </activity>
+    <!-- expo-web-browser: required for Chrome Custom Tab to close after OAuth redirect -->
+    <activity
+      android:name="expo.modules.webbrowser.RedirectActivity"
+      android:exported="true"
+      android:launchMode="singleTask">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="quietgoals"/>
+      </intent-filter>
     </activity>
     <receiver
       android:name=".widget.QuietGoalsWidgetReceiver"
