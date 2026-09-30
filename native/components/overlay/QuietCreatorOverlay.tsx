@@ -3,7 +3,7 @@ import {
     StyleSheet, View, TextInput, TouchableOpacity,
     Text, TouchableWithoutFeedback, Keyboard, Platform, ScrollView
 } from 'react-native';
-import { AlignLeft, Clock, Star } from 'lucide-react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreatorStore } from '../CreatorContext';
 import { NativeKeyboardAvoidingView } from '../native/NativeKeyboardAvoidingView';
@@ -14,25 +14,26 @@ interface QuietCreatorOverlayProps {
     onClose: () => void;
 }
 
-const PROJECTS = ['Inbox', 'Work', 'Personal', 'Errands'];
+const PRIORITIES = ['none', 'low', 'medium', 'high'] as const;
+type Priority = typeof PRIORITIES[number];
 
 export const QuietCreatorOverlay: React.FC<QuietCreatorOverlayProps> = ({ visible, onClose }) => {
     const { colors } = useTheme();
     const styles = getStyles(colors);
     const insets = useSafeAreaInsets();
     const [text, setText] = useState('');
-    const [selectedProject, setSelectedProject] = useState('Inbox');
-    const { addTasks, updateTask, editingTask } = useCreatorStore();
+    const [selectedPriority, setSelectedPriority] = useState<Priority>('none');
+    const { addTasks, updateTask, editingTask, deleteTask } = useCreatorStore();
     const inputRef = useRef<TextInput>(null);
 
     useEffect(() => {
         if (visible) {
             if (editingTask) {
-                setText(editingTask.text);
-                setSelectedProject(editingTask.project || 'Inbox');
+                setText(editingTask.title || editingTask.text || '');
+                setSelectedPriority(editingTask.priority || 'none');
             } else {
                 setText('');
-                setSelectedProject('Inbox');
+                setSelectedPriority('none');
             }
             setTimeout(() => {
                 inputRef.current?.focus();
@@ -45,15 +46,18 @@ export const QuietCreatorOverlay: React.FC<QuietCreatorOverlayProps> = ({ visibl
 
         if (editingTask) {
             await updateTask(editingTask.id, {
+                title: text.trim(),
                 text: text.trim(),
-                project: selectedProject
+                priority: selectedPriority
             });
         } else {
             await addTasks([{
                 id: Date.now().toString(),
+                title: text.trim(),
                 text: text.trim(),
                 completed: false,
-                project: selectedProject,
+                status: 'active',
+                priority: selectedPriority,
                 isPinned: false,
                 createdAt: Date.now()
             }]);
@@ -91,30 +95,40 @@ export const QuietCreatorOverlay: React.FC<QuietCreatorOverlayProps> = ({ visibl
                         />
 
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.projectsScroll} contentContainerStyle={styles.projectsContainer} keyboardShouldPersistTaps="always">
-                            {PROJECTS.map(proj => (
+                            {PRIORITIES.map(priority => (
                                 <TouchableOpacity
-                                    key={proj}
-                                    style={[styles.projectChip, selectedProject === proj && styles.projectChipSelected]}
-                                    onPressIn={() => setSelectedProject(proj)}
+                                    key={priority}
+                                    style={[
+                                        styles.projectChip, 
+                                        selectedPriority === priority && styles.projectChipSelected,
+                                        selectedPriority === priority && priority === 'low' && { backgroundColor: '#3b82f644', borderColor: '#3b82f6' },
+                                        selectedPriority === priority && priority === 'medium' && { backgroundColor: '#eab30844', borderColor: '#eab308' },
+                                        selectedPriority === priority && priority === 'high' && { backgroundColor: '#ef444444', borderColor: '#ef4444' },
+                                    ]}
+                                    onPressIn={() => setSelectedPriority(priority)}
                                 >
-                                    <Text style={[styles.projectChipText, selectedProject === proj && styles.projectChipTextSelected]}>
-                                        {proj}
+                                    <Text style={[styles.projectChipText, selectedPriority === priority && styles.projectChipTextSelected]}>
+                                        {priority === 'none' ? 'No Priority' : priority.charAt(0).toUpperCase() + priority.slice(1)}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
 
                         <View style={styles.toolbar}>
-                            <View style={styles.iconGroup}>
-                                <TouchableOpacity style={styles.iconButton}>
-                                    <AlignLeft size={20} color={colors.icon} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.iconButton}>
-                                    <Clock size={20} color={colors.icon} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.iconButton}>
-                                    <Star size={20} color={colors.icon} />
-                                </TouchableOpacity>
+                            <View style={styles.toolbarLeft}>
+                                {editingTask && (
+                                    <TouchableOpacity 
+                                        style={styles.deleteButton} 
+                                        onPressIn={() => {
+                                            deleteTask(editingTask.id);
+                                            setText('');
+                                            Keyboard.dismiss();
+                                            onClose();
+                                        }}
+                                    >
+                                        <Text style={styles.deleteButtonText}>Delete</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                             <TouchableOpacity style={styles.saveButton} onPressIn={handleSave}>
                                 <Text style={styles.saveButtonText}>Save</Text>
@@ -188,12 +202,23 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    iconGroup: {
+    toolbarLeft: {
+        flex: 1,
         flexDirection: 'row',
-        gap: 16,
+        alignItems: 'center',
     },
-    iconButton: {
-        padding: 8,
+    deleteButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: '#ef444422',
+        borderRadius: 16,
+    },
+    deleteButtonText: {
+        color: '#ef4444',
+        fontSize: 14,
+        fontFamily: 'Calm-Bold',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     saveButton: {
         paddingVertical: 12,

@@ -1,7 +1,8 @@
-import React, { useMemo, useRef } from 'react';
-import { StyleSheet, View, Text, StatusBar, SectionList, TouchableOpacity, Animated, PanResponder } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { StyleSheet, View, Text, StatusBar, TouchableOpacity, Animated, PanResponder } from 'react-native';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, CheckCircle2, Circle, Pin, PinOff, Trash2 } from 'lucide-react-native';
+import { Settings, CheckCircle2, Circle, Pin, PinOff, Trash2, RotateCcw, XCircle } from 'lucide-react-native';
 import { useCreatorStore } from '../CreatorContext';
 import { TodoItem } from '../../lib/storage';
 import { PinWarningModal } from '../overlay/PinWarningModal';
@@ -13,7 +14,7 @@ interface HomeViewProps {
 }
 
 
-const SwipeableTaskRow = ({
+const TaskRow = ({
   item,
   toggleTaskCompletion,
   toggleTaskPin,
@@ -28,82 +29,70 @@ const SwipeableTaskRow = ({
 }) => {
   const { colors } = useTheme();
   const styles = getStyles(colors);
-  const translateX = useRef(new Animated.Value(0)).current;
-  const isOpened = useRef(false);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        let newX = gestureState.dx + (isOpened.current ? -80 : 0);
-        if (newX > 0) newX = 0;
-        if (newX < -120) newX = -120;
-        translateX.setValue(newX);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -30 || (isOpened.current && gestureState.dx < 30)) {
-          isOpened.current = true;
-          Animated.spring(translateX, {
-            toValue: -80,
-            useNativeDriver: true,
-            bounciness: 0,
-          }).start();
-        } else {
-          isOpened.current = false;
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 0,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        isOpened.current = false;
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          bounciness: 0,
-        }).start();
-      }
-    })
-  ).current;
+  const priorityColors: Record<string, string> = {
+    none: 'transparent',
+    low: '#3B82F6', // blue
+    medium: '#F59E0B', // yellow
+    high: '#EF4444' // red
+  };
+  const priorityColor = item.priority ? priorityColors[item.priority] : 'transparent';
+  
+  const isArchived = item.completed || item.status === 'completed' || item.status === 'killed';
 
   return (
     <View style={styles.swipeableContainer}>
-      <View style={styles.deleteActionContainer}>
-        <TouchableOpacity style={styles.deleteButton} onPress={() => deleteTask(item.id)}>
-          <Trash2 size={24} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-      <Animated.View
+      <View
         style={[
           styles.taskRow,
-          item.completed && styles.taskRowCompleted,
-          { transform: [{ translateX }] }
+          isArchived && styles.taskRowCompleted,
         ]}
-        {...panResponder.panHandlers}
       >
-        <TouchableOpacity
-          style={styles.checkbox}
-          onPress={() => toggleTaskCompletion(item.id)}
-          activeOpacity={0.7}
-        >
-          {item.completed ? (
-            <CheckCircle2 size={24} color={colors.iconInactive} />
-          ) : (
+        {!isArchived ? (
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={() => toggleTaskCompletion(item.id)}
+            activeOpacity={0.7}
+          >
             <Circle size={24} color={colors.icon} />
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.checkbox, { opacity: 1 }]}>
+            {item.status === 'killed' ? (
+              <XCircle size={24} color="#ef4444" />
+            ) : (
+              <CheckCircle2 size={24} color="#10b981" />
+            )}
+          </View>
+        )}
 
-        <TouchableOpacity style={{ flex: 1, paddingVertical: 4 }} onPress={() => openOverlay(item)}>
-          <Text style={[styles.taskText, item.completed && styles.taskTextCompleted, { flex: undefined }]}>
-            {item.text}
+        <TouchableOpacity 
+          style={{ flex: 1, paddingVertical: 4 }} 
+          onPress={() => {
+            if (!isArchived) openOverlay(item);
+          }}
+          disabled={isArchived}
+        >
+          <Text style={[styles.taskText, isArchived && styles.taskTextCompleted, { flex: undefined }]}>
+            {item.title || item.text}
           </Text>
         </TouchableOpacity>
+        
+        {/* Priority Indicator */}
+        {priorityColor !== 'transparent' && (
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: priorityColor, marginLeft: 8 }} />
+        )}
 
-        {!item.completed && (
+        {isArchived ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12, gap: 12 }}>
+            <TouchableOpacity onPress={() => toggleTaskCompletion(item.id)}>
+              <RotateCcw size={20} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => deleteTask(item.id)}>
+              <Trash2 size={20} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        ) : (
           <TouchableOpacity
             style={[styles.pinButton, item.isPinned && styles.pinButtonActive]}
             onPress={() => toggleTaskPin(item.id)}
@@ -115,7 +104,7 @@ const SwipeableTaskRow = ({
             )}
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
     </View>
   );
 };
@@ -126,27 +115,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const { isDark, colors } = useTheme();
   const styles = getStyles(colors);
-  const { allTasks, toggleTaskCompletion, toggleTaskPin, deleteTask, openOverlay, isPinWarningVisible, hidePinWarning, handlePinWarningAccept } = useCreatorStore();
+  const { allTasks, toggleTaskCompletion, toggleTaskPin, deleteTask, reorderTasks, openOverlay, isPinWarningVisible, hidePinWarning, handlePinWarningAccept } = useCreatorStore();
 
-  const sections = useMemo(() => {
-    // Sort tasks: uncompleted first, then by creation date (newest first)
-    const sortedTasks = [...allTasks].sort((a, b) => {
-      if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      return (b.createdAt || 0) - (a.createdAt || 0);
+  const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
+
+  const visibleTasks = useMemo(() => {
+    return allTasks.filter(task => {
+        const isArchived = task.status === 'completed' || task.status === 'killed' || task.completed;
+        return activeTab === 'archive' ? isArchived : !isArchived;
+    }).sort((a, b) => {
+        if (a.position && b.position) return a.position.localeCompare(b.position);
+        return 0;
     });
-
-    const grouped = sortedTasks.reduce((acc, task) => {
-      const project = task.project || 'Inbox';
-      if (!acc[project]) acc[project] = [];
-      acc[project].push(task);
-      return acc;
-    }, {} as Record<string, TodoItem[]>);
-
-    return Object.entries(grouped).map(([title, data]) => ({ title, data }));
-  }, [allTasks]);
+  }, [allTasks, activeTab]);
 
   const renderTask = ({ item }: { item: TodoItem }) => (
-    <SwipeableTaskRow
+    <TaskRow
       item={item}
       toggleTaskCompletion={toggleTaskCompletion}
       toggleTaskPin={toggleTaskPin}
@@ -159,35 +143,47 @@ export const HomeView: React.FC<HomeViewProps> = ({
     <SafeAreaView style={styles.homeContainer}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Today</Text>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity onPress={() => setActiveTab('active')} style={[styles.tabButton, activeTab === 'active' && styles.tabButtonActive]}>
+            <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>Active</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('archive')} style={[styles.tabButton, activeTab === 'archive' && styles.tabButtonActive]}>
+            <Text style={[styles.tabText, activeTab === 'archive' && styles.tabTextActive]}>Archive</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity style={styles.headerBtn} onPress={onSettingsPress} activeOpacity={0.7}>
           <Settings size={24} color={colors.icon} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        {allTasks.length === 0 ? (
+        {visibleTasks.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>All clear.</Text>
-            <Text style={styles.emptySubtitle}>Tap + to capture what's on your mind.</Text>
+            <Text style={styles.emptyTitle}>{activeTab === 'active' ? 'All clear.' : 'Archive empty.'}</Text>
+            <Text style={styles.emptySubtitle}>{activeTab === 'active' ? 'Tap + to capture what\'s on your mind.' : 'Completed and killed goals will appear here.'}</Text>
           </View>
         ) : (
-          <SectionList
-            sections={sections}
+          <DraggableFlatList
+            data={visibleTasks}
             keyExtractor={(item) => item.id}
-            renderItem={renderTask}
-            renderSectionHeader={({ section: { title } }) => {
-              const projectColors = colors.projectColors[title] || colors.projectColors['Inbox'];
-              return (
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.projectChip, { backgroundColor: projectColors.bg }]}>
-                    <Text style={[styles.projectChipText, { color: projectColors.text }]}>{title}</Text>
-                  </View>
-                </View>
-              );
+            renderItem={({ item, drag, isActive }) => (
+                <ScaleDecorator>
+                  <TouchableOpacity
+                    onLongPress={drag}
+                    disabled={isActive}
+                    delayLongPress={200}
+                    activeOpacity={1}
+                  >
+                    {renderTask({ item })}
+                  </TouchableOpacity>
+                </ScaleDecorator>
+            )}
+            onDragEnd={({ data, from, to }) => {
+              if (from !== to) {
+                reorderTasks(data, from, to);
+              }
             }}
             contentContainerStyle={styles.listContent}
-            stickySectionHeadersEnabled={false}
           />
         )}
       </View>
@@ -215,6 +211,26 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontFamily: 'Calm-Bold',
+    color: colors.text,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  tabButton: {
+    paddingVertical: 4,
+  },
+  tabButtonActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.text,
+  },
+  tabText: {
+    fontSize: 24,
+    fontFamily: 'Calm-Bold',
+    color: colors.textSecondary,
+  },
+  tabTextActive: {
     color: colors.text,
   },
   headerBtn: {
