@@ -1,5 +1,5 @@
-import { sql, relations } from 'drizzle-orm';
-import { index, sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { relations, sql } from "drizzle-orm";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
@@ -14,7 +14,7 @@ export const user = sqliteTable("user", {
     .notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-    .$onUpdate(() => new Date())
+    .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
 
@@ -28,7 +28,7 @@ export const session = sqliteTable(
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
@@ -63,7 +63,7 @@ export const account = sqliteTable(
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
   (table) => [index("account_userId_idx").on(table.userId)],
@@ -81,7 +81,7 @@ export const verification = sqliteTable(
       .notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
@@ -105,75 +105,3 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
-
-export const goals = sqliteTable(
-  'goals',
-  {
-    id: text('id')
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-    title: text('title').notNull(),
-    status: text('status', { enum: ['active', 'completed', 'killed'] })
-      .notNull()
-      .default('active'),
-    priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] })
-      .notNull()
-      .default('none'),
-    position: text('position').notNull(),
-    createdAt: text('created_at')
-      .notNull()
-      .default(sql`(CURRENT_TIMESTAMP)`),
-    updatedAt: text('updated_at')
-      .notNull()
-      .default(sql`(CURRENT_TIMESTAMP)`),
-    archivedAt: text('archived_at'),
-  },
-  (table) => [
-    index('goals_user_id_status_position_idx').on(
-      table.userId,
-      table.status,
-      table.position,
-    ),
-    index('goals_user_id_archived_at_idx').on(
-      table.userId,
-      table.archivedAt,
-    ),
-  ],
-);
-
-export const apiTokens = sqliteTable(
-  'api_tokens',
-  {
-    id: text('id')
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-    tokenHash: text('token_hash').notNull(),
-    createdAt: text('created_at')
-      .notNull()
-      .default(sql`(CURRENT_TIMESTAMP)`),
-    lastUsedAt: text('last_used_at'),
-    revokedAt: text('revoked_at'),
-  },
-  (table) => [
-    index('api_tokens_token_hash_idx').on(table.tokenHash),
-    index('api_tokens_user_id_revoked_at_idx').on(table.userId, table.revokedAt),
-  ],
-);
-
-export type User = typeof user.$inferSelect;
-export type NewUser = typeof user.$inferInsert;
-
-export type Goal = typeof goals.$inferSelect;
-export type NewGoal = typeof goals.$inferInsert;
-
-export type ApiToken = typeof apiTokens.$inferSelect;
-export type NewApiToken = typeof apiTokens.$inferInsert;
-
-export type GoalStatus = 'active' | 'completed' | 'killed';
-export type GoalPriority = 'none' | 'low' | 'medium' | 'high';

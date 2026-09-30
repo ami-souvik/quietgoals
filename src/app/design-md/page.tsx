@@ -21,8 +21,8 @@ export default function DesignMdPage() {
     status: 'active',
     priority: priority,
     position: 'a',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     archivedAt: null
   };
 
@@ -128,8 +128,6 @@ export default function DesignMdPage() {
               Active {3} <span className="mx-2 font-normal text-text-muted/50">·</span>
               <ArchiveCounter 
                 count={10} 
-                onClick={() => {}}
-                isActive={false}
               />
             </div>
           </div>

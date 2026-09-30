@@ -11,7 +11,7 @@ A single-list, keyboard-first, unapologetically minimal goals app built with Nex
 - **Motion:** Framer Motion (spring-based physics, zero layout shifts)
 - **Database:** Turso (libSQL / SQLite) via `@libsql/client`
 - **ORM:** Drizzle ORM & Drizzle Kit
-- **Auth:** Auth.js v5 (NextAuth) with Google, GitHub, and local dev fallback
+- **Auth:** Auth.js v5 (NextAuth) with Google, and local dev fallback
 - **Validation:** Zod v4 (strict input validation on all mutations)
 - **Testing:** Native Node.js test runner (`tsx --test`) for unit tests & Playwright for E2E happy-path
 
@@ -66,8 +66,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `AUTH_TRUST_HOST` | Prod | Set to `true` when deployed behind Vercel or reverse proxies | `true` |
 | `AUTH_GOOGLE_ID` | Optional | Google OAuth 2.0 Client ID | `xxx.apps.googleusercontent.com` |
 | `AUTH_GOOGLE_SECRET` | Optional | Google OAuth 2.0 Client Secret | `GOCSPX-...` |
-| `AUTH_GITHUB_ID` | Optional | GitHub OAuth App Client ID | `Ov23li...` |
-| `AUTH_GITHUB_SECRET` | Optional | GitHub OAuth App Client Secret | `9a7b...` |
 
 ---
 
@@ -194,16 +192,13 @@ Before pointing production traffic to your Vercel deployment:
   - `AUTH_URL` = `https://your-domain.com` (or preview URL)
   - `AUTH_TRUST_HOST` = `true`
   - `AUTH_GOOGLE_ID` & `AUTH_GOOGLE_SECRET`
-  - `AUTH_GITHUB_ID` & `AUTH_GITHUB_SECRET`
 - [ ] **4. Configure OAuth Provider Callback URLs**:
   - **Google Cloud Console:**
     - Authorized Redirect URI: `https://your-domain.com/api/auth/callback/google`
-  - **GitHub Developer Settings:**
-    - Authorization Callback URL: `https://your-domain.com/api/auth/callback/github`
 - [ ] **5. Set Custom Domain**:
   - In Vercel Project Settings $\rightarrow$ Domains, add your domain (e.g. `quietgoals.com`).
   - Configure DNS CNAME / A records as prompted.
 - [ ] **6. Validate Production Deployment**:
   - Check `/api/health` returns HTTP 200 with `{"status": "ok"}`.
-  - Sign in with Google / GitHub.
+  - Sign in with Google.
   - Create a goal, edit, reorder, complete, and restore.

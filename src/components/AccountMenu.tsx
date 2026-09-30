@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { AgentSettingsModal } from '@/components/AgentSettingsModal';
+import { signOut } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
 
 interface AccountMenuProps {
   user?: {
@@ -10,13 +12,13 @@ interface AccountMenuProps {
     email?: string | null;
     image?: string | null;
   };
-  signOutAction: () => Promise<void>;
 }
 
-export function AccountMenu({ user, signOutAction }: AccountMenuProps) {
+export function AccountMenu({ user }: AccountMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -80,9 +82,17 @@ export function AccountMenu({ user, signOutAction }: AccountMenuProps) {
             </button>
           </div>
 
-          <form action={signOutAction} className="mt-1">
+          <div className="mt-1">
             <button
-              type="submit"
+              onClick={async () => {
+                await signOut({
+                  fetchOptions: {
+                    onSuccess: () => {
+                      router.push('/login');
+                    }
+                  }
+                });
+              }}
               className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-ember transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-ember"
             >
               <span>Sign out</span>
@@ -99,7 +109,7 @@ export function AccountMenu({ user, signOutAction }: AccountMenuProps) {
                 />
               </svg>
             </button>
-          </form>
+          </div>
         </div>
       )}
 

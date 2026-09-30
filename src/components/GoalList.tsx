@@ -226,7 +226,6 @@ interface GoalListProps {
     email?: string | null;
     image?: string | null;
   };
-  signOutAction?: () => Promise<void>;
   initialGoals: Goal[];
   initialArchivedGoals?: Goal[];
   initialSoundEnabled?: boolean;
@@ -234,7 +233,6 @@ interface GoalListProps {
 
 export function GoalList({
   user,
-  signOutAction,
   initialGoals,
   initialArchivedGoals = [],
   initialSoundEnabled = false,
@@ -904,8 +902,8 @@ export function GoalList({
 
         <div className="flex items-center gap-2">
           <SoundToggle enabled={soundOn} onToggle={handleToggleSound} />
-          {user && signOutAction && (
-            <AccountMenu user={user} signOutAction={signOutAction} />
+          {user && (
+            <AccountMenu user={user} />
           )}
         </div>
       </header>

@@ -6,8 +6,8 @@ test.describe('Quiet Goals Web - Happy Path', () => {
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Quiet Goals' })).toBeVisible();
 
-    const githubButton = page.getByRole('button', { name: /continue with github/i });
-    await githubButton.click();
+    const googleButton = page.getByRole('button', { name: /continue with google/i });
+    await googleButton.click();
 
     // Verify redirected to dashboard
     await page.waitForURL('/');
