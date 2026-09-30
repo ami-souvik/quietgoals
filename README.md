@@ -22,8 +22,8 @@ A single-list, keyboard-first, unapologetically minimal goals app built with Nex
 ### 1. Clone & Install Dependencies
 
 ```bash
-git clone <repo-url> quiet-goals-web
-cd quiet-goals-web
+git clone https://github.com/ami-souvik/quietgoals.git quietgoals
+cd quietgoals
 npm install
 ```
 
