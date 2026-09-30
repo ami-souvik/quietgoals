@@ -74,23 +74,45 @@ export const WallpaperCanvas: React.FC = () => {
       >
         {pinnedTasks.length > 0 ? (
           <View style={styles.tasksContainer}>
-            {pinnedTasks.map((task, index) => (
-              <Text
-                key={task.id}
-                style={[
-                  styles.floatingText,
-                  {
-                    color: getMood(moodId).textColor,
-                    fontFamily: currentFont,
-                    textTransform: getMood(moodId).uppercase ? 'uppercase' : 'none',
-                    fontSize: 32 * fontSizeScale,
-                    textAlign: currentVariant.textAlign as 'left' | 'center' | 'right',
+            {pinnedTasks.map((task, index) => {
+              const priorityColors: Record<string, string> = {
+                none: 'transparent',
+                low: '#3B82F6',
+                medium: '#F59E0B',
+                high: '#EF4444'
+              };
+              const priorityColor = task.priority ? priorityColors[task.priority] : 'transparent';
+              
+              return (
+                <View key={task.id} style={[
+                  styles.taskRow, 
+                  { 
+                    backgroundColor: getMood(moodId).textColor + '15', // very subtle glass background
+                    alignSelf: currentVariant.textAlign === 'center' ? 'center' : 
+                               currentVariant.textAlign === 'right' ? 'flex-end' : 'flex-start'
                   }
-                ]}
-              >
-                {task.text}
-              </Text>
-            ))}
+                ]}>
+                  <View style={[styles.taskCheckbox, { borderColor: getMood(moodId).textColor + '80' }]} />
+                  <Text
+                    style={[
+                      styles.floatingText,
+                      {
+                        color: getMood(moodId).textColor,
+                        fontFamily: currentFont,
+                        textTransform: getMood(moodId).uppercase ? 'uppercase' : 'none',
+                        fontSize: 24, // Standard font size
+                        flexShrink: 1,
+                      }
+                    ]}
+                  >
+                    {task.title || task.text}
+                  </Text>
+                  {priorityColor !== 'transparent' && (
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: priorityColor, marginLeft: 12, alignSelf: 'center' }} />
+                  )}
+                </View>
+              );
+            })}
           </View>
         ) : (
           <Text
@@ -100,7 +122,7 @@ export const WallpaperCanvas: React.FC = () => {
                 color: getMood(moodId).textColor + '80', // semi-transparent placeholder
                 fontFamily: currentFont,
                 textTransform: getMood(moodId).uppercase ? 'uppercase' : 'none',
-                fontSize: 32 * fontSizeScale,
+                fontSize: 24,
                 textAlign: currentVariant.textAlign as 'left' | 'center' | 'right',
               }
             ]}
@@ -128,7 +150,21 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   floatingText: {
-    width: '100%',
     backgroundColor: 'transparent',
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 24,
+    maxWidth: '100%',
+  },
+  taskCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginRight: 16,
   },
 });

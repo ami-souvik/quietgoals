@@ -37,9 +37,7 @@ export const CreatorToolbar: React.FC<CreatorToolbarProps> = ({ onSave }: Creato
 
       <ToolbarButton icon={LayoutTemplate} label="Layout" onPress={() => setActiveTool(activeTool === 'layout' ? 'none' : 'layout')} isActive={activeTool === 'layout'} />
 
-      <ToolbarButton icon={ALargeSmall} label="Size" onPress={() => setActiveTool(activeTool === 'font' ? 'none' : 'font')} isActive={activeTool === 'font'} />
 
-      <ToolbarButton icon={ImageIcon} label="Bg" onPress={() => setActiveTool(activeTool === 'bg' ? 'none' : 'bg')} isActive={activeTool === 'bg'} />
 
       <View style={styles.toolbarDivider} />
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { MoodOverlay, LayoutOverlay, FontOverlay, BgOverlay, ApplyOverlay } from '.';
+import { MoodOverlay, LayoutOverlay, ApplyOverlay } from '.';
 import { useCreatorStore } from '../CreatorContext';
 
 interface CreatorOverlayProps {
@@ -19,10 +19,7 @@ export const CreatorOverlay: React.FC<CreatorOverlayProps> = ({
         return <MoodOverlay />;
       case 'layout':
         return <LayoutOverlay />;
-      case 'font':
-        return <FontOverlay />;
-      case 'bg':
-        return <BgOverlay />;
+
       default:
         return null;
     }

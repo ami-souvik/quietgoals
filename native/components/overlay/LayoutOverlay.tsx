@@ -33,14 +33,14 @@ export const LayoutOverlay = () => {
                 style={[
                     styles.toolChip,
                     {
-                        backgroundColor: isSelected ? '#fff' : 'transparent'
+                        backgroundColor: isSelected ? colors.text : 'transparent'
                     }
                 ]}
             >
                 {
                     isSelected ?
-                        getVariantIcon(horizontal, '#333')
-                        : <Dot size={16} color='#fff' />
+                        getVariantIcon(horizontal, colors.primaryBackground)
+                        : <Dot size={16} color={colors.text} />
                 }
             </TouchableOpacity>
         );

@@ -3,17 +3,17 @@ import { useColorScheme } from 'react-native';
 export const COLORS = {
   light: {
     background: '#F9FAFB',
-    text: '#111',
+    text: '#111111',
     textSecondary: '#64748B',
-    card: '#fff',
+    card: '#ffffff',
     cardSecondary: '#F1F5F9',
-    icon: '#111',
+    icon: '#111111',
     iconInactive: '#A0A0A0',
     pinBg: '#F8FAFC',
     pinActiveBg: '#FEF3C7',
     shadowOpacity: 0.05,
-    primary: '#111',
-    primaryBackground: '#fff',
+    primary: '#111111',
+    primaryBackground: '#ffffff',
     projectColors: {
       'Inbox': { bg: '#F1F5F9', text: '#475569' },
       'Work': { bg: '#E0E7FF', text: '#3730A3' },
