@@ -343,7 +343,9 @@ export function GoalList({
 
             if (activeChanged) {
               setActiveItems(data.activeGoals);
-              dispatchOptimistic({ type: 'setList', goals: data.activeGoals });
+              startTransition(() => {
+                dispatchOptimistic({ type: 'setList', goals: data.activeGoals });
+              });
             }
 
             // Check if archived goals have changed
@@ -414,14 +416,15 @@ export function GoalList({
           )
         );
       }
-      dispatchOptimistic({
-        type: 'reorder',
-        id: goalId,
-        position: newPosition,
-      });
 
       // 2. Call server action with offline queue
       startTransition(async () => {
+        dispatchOptimistic({
+          type: 'reorder',
+          id: goalId,
+          position: newPosition,
+        });
+
         await mutationQueue.enqueue('move goal', async () => {
           const res = await moveGoal({
             id: goalId,
@@ -432,10 +435,12 @@ export function GoalList({
           if (res.success && res.position) {
             // If server regenerated keys during collision, sync them
             if (res.position !== newPosition) {
-              dispatchOptimistic({
-                type: 'reorder',
-                id: goalId,
-                position: res.position,
+              startTransition(() => {
+                dispatchOptimistic({
+                  type: 'reorder',
+                  id: goalId,
+                  position: res.position,
+                });
               });
             }
           }
@@ -498,13 +503,13 @@ export function GoalList({
         a.position.localeCompare(b.position)
       );
       setActiveItems(newList);
-      dispatchOptimistic({ type: 'create', goal: optimisticGoal });
       setFocusedId(id);
       setNewTitle('');
       play('create');
       announce(`Goal created: ${trimmed}`);
 
       startTransition(async () => {
+        dispatchOptimistic({ type: 'create', goal: optimisticGoal });
         const success = await mutationQueue.enqueue('create goal', () =>
           createGoal({
             id,
@@ -606,13 +611,13 @@ export function GoalList({
       setActiveItems((prev) =>
         prev.map((g) => (g.id === focusedGoal.id ? { ...g, ...updated } : g))
       );
-      dispatchOptimistic({
-        type: 'update',
-        id: focusedGoal.id,
-        data: updated,
-      });
 
       startTransition(async () => {
+        dispatchOptimistic({
+          type: 'update',
+          id: focusedGoal.id,
+          data: updated,
+        });
         await mutationQueue.enqueue('update priority', () =>
           updateGoal({ id: focusedGoal.id, priority })
         );
@@ -687,7 +692,9 @@ export function GoalList({
         return next;
       });
       setActiveItems((prev) => prev.filter((g) => g.id !== goalId));
-      dispatchOptimistic({ type: 'remove', id: goalId });
+      startTransition(() => {
+        dispatchOptimistic({ type: 'remove', id: goalId });
+      });
     },
     [dispatchOptimistic]
   );
@@ -720,11 +727,11 @@ export function GoalList({
         a.position.localeCompare(b.position)
       );
       setActiveItems(newList);
-      dispatchOptimistic({ type: 'create', goal: restoredGoal });
       setFocusedId(goalToRestore.id);
 
       // 3. Start server action with offline queue
       startTransition(async () => {
+        dispatchOptimistic({ type: 'create', goal: restoredGoal });
         await mutationQueue.enqueue('restore goal', () =>
           restoreGoal({ id: goalToRestore.id, position: newPosition })
         );
@@ -976,12 +983,12 @@ export function GoalList({
                               setActiveItems((prev) =>
                                 prev.map((g) => (g.id === goal.id ? { ...g, ...updated } : g))
                               );
-                              dispatchOptimistic({
-                                type: 'update',
-                                id: goal.id,
-                                data: updated,
-                              });
                               startTransition(async () => {
+                                dispatchOptimistic({
+                                  type: 'update',
+                                  id: goal.id,
+                                  data: updated,
+                                });
                                 await mutationQueue.enqueue('update title', () =>
                                   updateGoal({ id: goal.id, title: trimmed })
                                 );
@@ -1006,12 +1013,12 @@ export function GoalList({
                             setActiveItems((prev) =>
                               prev.map((g) => (g.id === goal.id ? { ...g, ...updated } : g))
                             );
-                            dispatchOptimistic({
-                              type: 'update',
-                              id: goal.id,
-                              data: updated,
-                            });
                             startTransition(async () => {
+                              dispatchOptimistic({
+                                type: 'update',
+                                id: goal.id,
+                                data: updated,
+                              });
                               await mutationQueue.enqueue('update priority', () =>
                                 updateGoal({ id: goal.id, priority: next })
                               );
