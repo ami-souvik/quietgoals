@@ -21,6 +21,7 @@ export default function DesignMdPage() {
     status: 'active',
     priority: priority,
     position: 'a',
+    isPinned: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     archivedAt: null

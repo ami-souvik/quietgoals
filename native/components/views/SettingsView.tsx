@@ -1,4 +1,4 @@
-import { StyleSheet, StatusBar, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, StatusBar, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackButton } from '../action';
 import { useNavigation } from '@react-navigation/native';
@@ -47,15 +47,28 @@ export const SettingsView: React.FC = () => {
     const handleAuth = async () => {
         if (session) {
             setAuthLoading(true);
-            await signOut();
+            try {
+                await signOut();
+            } catch (error) {
+                Alert.alert("Sign Out Error", "Could not sign out. Please try again.");
+            }
             setAuthLoading(false);
         } else {
             setAuthLoading(true);
-            await signIn.social({
-                provider: "google",
-                callbackURL: "quietgoals://",
-            });
-            setAuthLoading(false);
+            try {
+                const res = await signIn.social({
+                    provider: "google",
+                    callbackURL: "quietgoals://",
+                });
+                
+                if (res?.error) {
+                    Alert.alert("Sign In Error", res.error.message || "Failed to sign in with Google.");
+                }
+            } catch (error: any) {
+                Alert.alert("Sign In Error", error?.message || "An unexpected error occurred during sign in.");
+            } finally {
+                setAuthLoading(false);
+            }
         }
     };
 

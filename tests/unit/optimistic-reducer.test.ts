@@ -11,6 +11,7 @@ function makeGoal(id: string, title: string, position: string): Goal {
     status: 'active',
     priority: 'none',
     position,
+    isPinned: false,
     createdAt: '2026-09-30T10:00:00.000Z',
     updatedAt: '2026-09-30T10:00:00.000Z',
     archivedAt: null,

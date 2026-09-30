@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: 'Invalid payload or unauthorized' }, { status: 400 });
   }
@@ -32,7 +32,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: 'Invalid payload or unauthorized' }, { status: 400 });
   }

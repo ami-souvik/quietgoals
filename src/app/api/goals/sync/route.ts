@@ -59,7 +59,7 @@ export async function POST(request: Request) {
             title: t.title,
             position: newKeys[idx],
             status: t.status,
-            priority: 'none',
+            priority: 'none' as const,
             createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
           }))
         );

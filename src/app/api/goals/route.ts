@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: 'Invalid payload or unauthorized' }, { status: 400 });
   }

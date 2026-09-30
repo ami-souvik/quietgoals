@@ -496,6 +496,7 @@ export function GoalList({
         status: 'active',
         priority: 'none',
         position,
+        isPinned: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         archivedAt: null,
