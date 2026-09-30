@@ -1,4 +1,4 @@
-import { StyleSheet, StatusBar, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, StatusBar, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackButton } from '../action';
 import { useNavigation } from '@react-navigation/native';
@@ -6,6 +6,7 @@ import { Palette, ChevronRight, LogIn, LogOut } from 'lucide-react-native';
 import { useTheme, ThemeColors } from '../../lib/theme';
 import { useSession, signIn, signOut } from '../../lib/auth-client';
 import { useState, useEffect } from 'react';
+import { AlertModal } from '../overlay/AlertModal';
 
 export const SettingsView: React.FC = () => {
     const { isDark, colors } = useTheme();
@@ -14,6 +15,11 @@ export const SettingsView: React.FC = () => {
     const { data: session, isPending } = useSession();
     const [authLoading, setAuthLoading] = useState(false);
     const [syncing, setSyncing] = useState(false);
+
+    const [alertState, setAlertState] = useState({ visible: false, title: '', message: '' });
+
+    const showAlert = (title: string, message: string) => setAlertState({ visible: true, title, message });
+    const closeAlert = () => setAlertState(prev => ({ ...prev, visible: false }));
 
     useEffect(() => {
         if (session && !syncing) {
@@ -50,7 +56,7 @@ export const SettingsView: React.FC = () => {
             try {
                 await signOut();
             } catch (error) {
-                Alert.alert("Sign Out Error", "Could not sign out. Please try again.");
+                showAlert("Sign Out Error", "Could not sign out. Please try again.");
             }
             setAuthLoading(false);
         } else {
@@ -62,10 +68,10 @@ export const SettingsView: React.FC = () => {
                 });
                 
                 if (res?.error) {
-                    Alert.alert("Sign In Error", res.error.message || "Failed to sign in with Google.");
+                    showAlert("Sign In Error", res.error.message || "Failed to sign in with Google.");
                 }
             } catch (error: any) {
-                Alert.alert("Sign In Error", error?.message || "An unexpected error occurred during sign in.");
+                showAlert("Sign In Error", error?.message || "An unexpected error occurred during sign in.");
             } finally {
                 setAuthLoading(false);
             }
@@ -106,6 +112,14 @@ export const SettingsView: React.FC = () => {
                     {!(isPending || authLoading) && <ChevronRight size={20} color={colors.iconInactive} />}
                 </TouchableOpacity>
             </View>
+
+            <AlertModal
+                visible={alertState.visible}
+                title={alertState.title}
+                message={alertState.message}
+                onAccept={closeAlert}
+                acceptText="OK"
+            />
         </SafeAreaView>
     );
 };

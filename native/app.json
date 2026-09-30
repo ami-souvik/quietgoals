@@ -1,9 +1,22 @@
 {
   "name": "QuietGoals",
   "displayName": "Quiet Goals",
+  "scheme": "quietgoals",
   "android": {
     "package": "com.qurtesy.quietgoals",
-    "versionCode": 5
+    "versionCode": 5,
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [
+          {
+            "scheme": "quietgoals"
+          }
+        ],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }
+    ]
   },
   "extra": {
     "eas": {
@@ -11,6 +24,7 @@
     }
   },
   "plugins": [
-    "expo-secure-store"
+    "expo-secure-store",
+    "expo-web-browser"
   ]
 }

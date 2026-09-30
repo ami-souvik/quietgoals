@@ -1,8 +1,15 @@
+import 'react-native-url-polyfill/auto';
 import { useFonts } from 'expo-font';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect } from 'react';
 
 const Stack = createNativeStackNavigator();
+
+// Warm up the browser for OAuth before it's needed — prevents the
+// "this._url.includes is not a function" crash in @better-auth/expo
+WebBrowser.maybeCompleteAuthSession();
 
 import { CreatorView, HomeView, SettingsView } from './components/views';
 import { ToastProvider } from './components/ToastContext';
@@ -14,6 +21,10 @@ import { WallpaperCanvas } from './components/WallpaperCanvas';
 import { View, Dimensions, StyleSheet } from 'react-native';
 
 function MainApp() {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync();
+    return () => { void WebBrowser.coolDownAsync(); };
+  }, []);
   const [fontsLoaded] = useFonts({
     'Oswald-Regular': require('./assets/fonts/Oswald-Regular.ttf'),
     'Oswald-Bold': require('./assets/fonts/Oswald-Bold.ttf'),

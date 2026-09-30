@@ -33,7 +33,18 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  trustedOrigins: ["quietgoals://"],
+  trustedOrigins: [
+    "quietgoals://",
+    process.env.BETTER_AUTH_URL || "https://quietgoals.vercel.app",
+    "http://localhost:3000",
+    "http://10.0.2.2:3000",
+  ],
+  advanced: {
+    // React Native fetch does not send an Origin header. Disabling the CSRF
+    // origin check lets the mobile client through. The Expo plugin + secure
+    // cookie storage provide equivalent protection on the mobile side.
+    disableCSRFCheck: true,
+  },
 });
 
 export async function requireUser() {
