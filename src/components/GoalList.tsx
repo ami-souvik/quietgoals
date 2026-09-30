@@ -33,10 +33,14 @@ export type GoalOptimisticAction =
   | { type: 'reorder'; id: string; position: string }
   | { type: 'setList'; goals: Goal[] };
 
-function goalReducer(state: Goal[], action: GoalOptimisticAction): Goal[] {
+export function comparePositions(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function goalReducer(state: Goal[], action: GoalOptimisticAction): Goal[] {
   switch (action.type) {
     case 'create':
-      return [...state, action.goal].sort((a, b) => a.position.localeCompare(b.position));
+      return [...state, action.goal].sort((a, b) => comparePositions(a.position, b.position));
     case 'update':
       return state.map((g) => (g.id === action.id ? { ...g, ...action.data } : g));
     case 'remove':
@@ -44,7 +48,7 @@ function goalReducer(state: Goal[], action: GoalOptimisticAction): Goal[] {
     case 'reorder':
       return state
         .map((g) => (g.id === action.id ? { ...g, position: action.position } : g))
-        .sort((a, b) => a.position.localeCompare(b.position));
+        .sort((a, b) => comparePositions(a.position, b.position));
     case 'setList':
       return action.goals;
     default:
@@ -500,11 +504,13 @@ export function GoalList({
       };
 
       const newList = [...optimisticGoals, optimisticGoal].sort((a, b) =>
-        a.position.localeCompare(b.position)
+        comparePositions(a.position, b.position)
       );
       setActiveItems(newList);
       setFocusedId(id);
       setNewTitle('');
+      setIsAddingBottom(false);
+      setInsertBelowId(null);
       play('create');
       announce(`Goal created: ${trimmed}`);
 
@@ -724,7 +730,7 @@ export function GoalList({
 
       // 2. Add to active goals optimistically at the bottom
       const newList = [...itemsToRender, restoredGoal].sort((a, b) =>
-        a.position.localeCompare(b.position)
+        comparePositions(a.position, b.position)
       );
       setActiveItems(newList);
       setFocusedId(goalToRestore.id);
