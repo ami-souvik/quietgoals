@@ -139,9 +139,9 @@ Response:
 
 | Tool Name | Description | Arguments |
 | :--- | :--- | :--- |
-| `list_goals` | Lists goals for the authenticated user, ordered by list position. | `status` *(optional)*: `'active'`, `'completed'`, `'killed'`, or `'all'` (default: `'active'`) |
-| `add_goal` | Adds a new goal to the user's active list with fractional position. | `title` *(required, string, 1–200 chars)*<br>`priority` *(optional)*: `'none'`, `'low'`, `'medium'`, `'high'` |
-| `update_goal` | Updates the title or priority of an existing goal. | `id` *(required, UUID string)*<br>`title` *(optional, string, 1–200 chars)*<br>`priority` *(optional)*: `'none'`, `'low'`, `'medium'`, `'high'` |
+| `list_goals` | Lists goals for the authenticated user, ordered by list position. | `status` *(optional)*: `'active'`, `'not-started'`, `'in-progress'`, `'completed'`, `'killed'`, or `'all'` (default: `'active'`) |
+| `add_goal` | Adds a new goal with fractional position. | `title` *(required, string, 1–200 chars)*<br>`priority` *(optional)*: `'none'`, `'low'`, `'medium'`, `'high'`<br>`status` *(optional)*: `'not-started'`, `'in-progress'`, `'completed'`, `'killed'` (default: `'not-started')`<br>`description` *(optional, string)*<br>`link` *(optional, URL/string)* |
+| `update_goal` | Updates the title, priority, status, description, or link of an existing goal. | `id` *(required, UUID string)*<br>`title` *(optional, string)*<br>`priority` *(optional)*: `'none'`, `'low'`, `'medium'`, `'high'`<br>`status` *(optional)*: `'not-started'`, `'in-progress'`, `'completed'`, `'killed'`<br>`description` *(optional, string)*<br>`link` *(optional, string)* |
 | `complete_goal` | Marks an active goal as completed and moves it to the archive. | `id` *(required, UUID string)* |
 | `kill_goal` | Marks an active goal as killed/abandoned and moves it to the archive. | `id` *(required, UUID string)* |
 | `restore_goal` | Restores an archived (completed or killed) goal back to active. | `id` *(required, UUID string)* |

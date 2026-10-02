@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, verifyBearerToken } from '@/lib/agentTokens';
 import { db } from '@/lib/db';
 import { goals, user, type GoalPriority, type GoalStatus } from '@/db/schema';
-import { and, asc, desc, eq, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { generateKeyBetween } from 'fractional-indexing';
 
 interface JsonRpcRequest {
@@ -47,7 +47,7 @@ const TOOLS_MANIFEST = [
       properties: {
         status: {
           type: 'string',
-          enum: ['active', 'completed', 'killed', 'all'],
+          enum: ['active', 'not-started', 'in-progress', 'completed', 'killed', 'all'],
           description: "Goal status to filter by (default: 'active')",
         },
       },
@@ -67,6 +67,19 @@ const TOOLS_MANIFEST = [
           type: 'string',
           enum: ['none', 'low', 'medium', 'high'],
           description: "Optional priority level (default: 'none')",
+        },
+        description: {
+          type: 'string',
+          description: 'Optional goal description',
+        },
+        link: {
+          type: 'string',
+          description: 'Optional link URL',
+        },
+        status: {
+          type: 'string',
+          enum: ['not-started', 'in-progress', 'completed', 'killed', 'active'],
+          description: "Initial status (default: 'not-started')",
         },
       },
       required: ['title'],
@@ -90,6 +103,19 @@ const TOOLS_MANIFEST = [
           type: 'string',
           enum: ['none', 'low', 'medium', 'high'],
           description: 'Updated priority',
+        },
+        description: {
+          type: 'string',
+          description: 'Updated goal description (pass empty string to clear)',
+        },
+        link: {
+          type: 'string',
+          description: 'Updated link URL (pass empty string to clear)',
+        },
+        status: {
+          type: 'string',
+          enum: ['not-started', 'in-progress', 'completed', 'killed', 'active'],
+          description: "Updated status ('not-started', 'in-progress', 'completed', 'killed')",
         },
       },
       required: ['id'],
@@ -155,7 +181,7 @@ async function handleToolCall(
   switch (toolName) {
     case 'list_goals': {
       const requestedStatus = (args.status as string) || 'active';
-      const validStatuses = ['active', 'completed', 'killed', 'all'];
+      const validStatuses = ['active', 'not-started', 'in-progress', 'completed', 'killed', 'all'];
       const statusFilter = validStatuses.includes(requestedStatus)
         ? requestedStatus
         : 'active';
@@ -165,6 +191,17 @@ async function handleToolCall(
 
       if (statusFilter === 'all') {
         rows = await query.orderBy(asc(goals.position));
+      } else if (statusFilter === 'active') {
+        rows = await db
+          .select()
+          .from(goals)
+          .where(
+            and(
+              userScope,
+              inArray(goals.status, ['not-started', 'in-progress', 'active'])
+            )
+          )
+          .orderBy(asc(goals.position));
       } else {
         rows = await db
           .select()
@@ -176,7 +213,9 @@ async function handleToolCall(
             )
           )
           .orderBy(
-            statusFilter === 'active' ? asc(goals.position) : desc(goals.archivedAt)
+            ['completed', 'killed'].includes(statusFilter)
+              ? desc(goals.archivedAt)
+              : asc(goals.position)
           );
       }
 
@@ -186,6 +225,8 @@ async function handleToolCall(
           title: g.title,
           status: g.status,
           priority: g.priority,
+          description: g.description,
+          link: g.link,
           position: g.position,
           createdAt: g.createdAt,
           updatedAt: g.updatedAt,
@@ -206,11 +247,18 @@ async function handleToolCall(
       const validPriorities: GoalPriority[] = ['none', 'low', 'medium', 'high'];
       const priority = validPriorities.includes(rawPriority) ? rawPriority : 'none';
 
+      const rawStatus = (args.status as GoalStatus) || 'not-started';
+      const validStatuses: GoalStatus[] = ['not-started', 'in-progress', 'completed', 'killed', 'active'];
+      const status = validStatuses.includes(rawStatus) ? rawStatus : 'not-started';
+
+      const description = typeof args.description === 'string' ? args.description.trim() || null : null;
+      const link = typeof args.link === 'string' ? args.link.trim() || null : null;
+
       // Find the last active goal for the user to append at the bottom
       const [lastActive] = await db
         .select({ position: goals.position })
         .from(goals)
-        .where(and(userScope, eq(goals.status, 'active')))
+        .where(and(userScope, inArray(goals.status, ['not-started', 'in-progress', 'active'])))
         .orderBy(desc(goals.position))
         .limit(1);
 
@@ -223,12 +271,14 @@ async function handleToolCall(
         userId,
         userEmail: userEmail ?? null,
         title: rawTitle,
-        status: 'active',
+        status,
         priority,
+        description,
+        link,
         position: newPosition,
         createdAt: now,
         updatedAt: now,
-        archivedAt: null,
+        archivedAt: ['completed', 'killed'].includes(status) ? now : null,
       });
 
       return {
@@ -236,8 +286,10 @@ async function handleToolCall(
         goal: {
           id: goalId,
           title: rawTitle,
-          status: 'active',
+          status,
           priority,
+          description,
+          link,
           position: newPosition,
           createdAt: now,
           updatedAt: now,
@@ -275,6 +327,26 @@ async function handleToolCall(
         const p = args.priority as GoalPriority;
         if (['none', 'low', 'medium', 'high'].includes(p)) {
           updates.priority = p;
+        }
+      }
+
+      if (args.description !== undefined) {
+        updates.description = typeof args.description === 'string' ? args.description.trim() || null : null;
+      }
+
+      if (args.link !== undefined) {
+        updates.link = typeof args.link === 'string' ? args.link.trim() || null : null;
+      }
+
+      if (typeof args.status === 'string') {
+        const s = args.status as GoalStatus;
+        if (['not-started', 'in-progress', 'completed', 'killed', 'active'].includes(s)) {
+          updates.status = s;
+          if (['completed', 'killed'].includes(s)) {
+            updates.archivedAt = new Date().toISOString();
+          } else {
+            updates.archivedAt = null;
+          }
         }
       }
 

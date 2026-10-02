@@ -17,6 +17,10 @@ const CreateGoalSchema = z.object({
     .max(200, 'Title must be 200 characters or fewer'),
   afterPosition: z.string().optional().nullable(),
   position: z.string().optional(),
+  description: z.string().optional().nullable(),
+  link: z.string().optional().nullable(),
+  status: z.enum(['not-started', 'in-progress', 'completed', 'killed', 'active']).optional(),
+  priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   isPinned: z.boolean().optional(),
 });
 
@@ -34,7 +38,7 @@ export async function createGoal(input: CreateGoalInput) {
     };
   }
 
-  const { id, title, afterPosition, position, isPinned } = validated.data;
+    const { id, title, afterPosition, position, description, link, status, priority, isPinned } = validated.data;
   const finalPosition = position ?? generateKeyBetween(afterPosition ?? null, null);
 
   const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
@@ -55,8 +59,10 @@ export async function createGoal(input: CreateGoalInput) {
       userEmail: user.email,
       title,
       position: finalPosition,
-      status: 'active',
-      priority: 'none',
+      status: status ?? 'not-started',
+      priority: priority ?? 'none',
+      description: description ?? null,
+      link: link ?? null,
       isPinned: isPinned ?? false,
     });
 
@@ -77,7 +83,9 @@ const UpdateGoalSchema = z.object({
     .max(200, 'Title must be 200 characters or fewer')
     .optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
-  status: z.enum(['active', 'completed', 'killed']).optional(),
+  status: z.enum(['not-started', 'in-progress', 'completed', 'killed', 'active']).optional(),
+  description: z.string().nullable().optional(),
+  link: z.string().nullable().optional(),
   position: z.string().optional(),
   isPinned: z.boolean().optional(),
 });
@@ -96,7 +104,7 @@ export async function updateGoal(input: UpdateGoalInput) {
     };
   }
 
-  const { id, title, priority, status, position, isPinned } = validated.data;
+  const { id, title, priority, status, description, link, position, isPinned } = validated.data;
 
   const userScope = or(eq(goals.userId, user.id), eq(goals.userEmail, user.email));
 
@@ -114,10 +122,20 @@ export async function updateGoal(input: UpdateGoalInput) {
     const hasTitleChange = title !== undefined && title !== existing.title;
     const hasPriorityChange = priority !== undefined && priority !== existing.priority;
     const hasStatusChange = status !== undefined && status !== existing.status;
+    const hasDescriptionChange = description !== undefined && description !== existing.description;
+    const hasLinkChange = link !== undefined && link !== existing.link;
     const hasPositionChange = position !== undefined && position !== existing.position;
     const hasIsPinnedChange = isPinned !== undefined && isPinned !== existing.isPinned;
 
-    if (!hasTitleChange && !hasPriorityChange && !hasStatusChange && !hasPositionChange && !hasIsPinnedChange) {
+    if (
+      !hasTitleChange &&
+      !hasPriorityChange &&
+      !hasStatusChange &&
+      !hasDescriptionChange &&
+      !hasLinkChange &&
+      !hasPositionChange &&
+      !hasIsPinnedChange
+    ) {
       return { success: true, noop: true };
     }
 
@@ -128,13 +146,15 @@ export async function updateGoal(input: UpdateGoalInput) {
 
     if (hasTitleChange) updateValues.title = title;
     if (hasPriorityChange) updateValues.priority = priority;
+    if (hasDescriptionChange) updateValues.description = description;
+    if (hasLinkChange) updateValues.link = link;
     if (hasPositionChange) updateValues.position = position;
     if (hasIsPinnedChange) updateValues.isPinned = isPinned;
     if (hasStatusChange) {
       updateValues.status = status;
       if (status === 'completed' || status === 'killed') {
         updateValues.archivedAt = now;
-      } else if (status === 'active') {
+      } else {
         updateValues.archivedAt = null;
       }
     }
@@ -299,7 +319,7 @@ export async function restoreGoal(input: z.infer<typeof RestoreGoalSchema>) {
     await db
       .update(goals)
       .set({
-        status: 'active',
+        status: 'not-started',
         position,
         archivedAt: null,
         updatedAt: now,
