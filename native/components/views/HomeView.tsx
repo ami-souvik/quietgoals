@@ -1,12 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, Text, StatusBar, TouchableOpacity, Animated, PanResponder } from 'react-native';
-import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { StyleSheet, View, Text, StatusBar, TouchableOpacity, Animated, PanResponder, RefreshControl } from 'react-native';
+import { NestableScrollContainer, NestableDraggableFlatList, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings, CheckCircle2, Circle, Pin, PinOff, Trash2, RotateCcw, XCircle } from 'lucide-react-native';
 import { useCreatorStore } from '../CreatorContext';
 import { TodoItem } from '../../lib/storage';
 import { PinWarningModal } from '../overlay/PinWarningModal';
 import { useTheme, ThemeColors } from '../../lib/theme';
+import { playSound } from '../../lib/sound';
 
 interface HomeViewProps {
   onCreatePress: () => void;
@@ -115,7 +116,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const { isDark, colors } = useTheme();
   const styles = getStyles(colors);
-  const { allTasks, toggleTaskCompletion, toggleTaskPin, deleteTask, reorderTasks, openOverlay, isPinWarningVisible, hidePinWarning, handlePinWarningAccept } = useCreatorStore();
+  const {
+    allTasks,
+    toggleTaskCompletion,
+    toggleTaskPin,
+    deleteTask,
+    reorderTasks,
+    openOverlay,
+    isPinWarningVisible,
+    hidePinWarning,
+    handlePinWarningAccept,
+    refreshTasks,
+    isRefreshing,
+  } = useCreatorStore();
 
   const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
 
@@ -128,6 +141,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
         return 0;
     });
   }, [allTasks, activeTab]);
+
+  const onRefresh = async () => {
+    playSound('keyTick');
+    await refreshTasks();
+  };
 
   const renderTask = ({ item }: { item: TodoItem }) => (
     <TaskRow
@@ -157,16 +175,38 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </View>
 
       <View style={styles.content}>
-        {visibleTasks.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{activeTab === 'active' ? 'All clear.' : 'Archive empty.'}</Text>
-            <Text style={styles.emptySubtitle}>{activeTab === 'active' ? 'Tap + to capture what\'s on your mind.' : 'Completed and killed goals will appear here.'}</Text>
-          </View>
-        ) : (
-          <DraggableFlatList
-            data={visibleTasks}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, drag, isActive }) => (
+        <NestableScrollContainer
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.text}
+              colors={[colors.text, '#d4af37']}
+              progressBackgroundColor={colors.card}
+            />
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            visibleTasks.length === 0 && styles.listContentEmpty,
+          ]}
+        >
+          {visibleTasks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>
+                {activeTab === 'active' ? 'All clear.' : 'Archive empty.'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {activeTab === 'active'
+                  ? "Tap + to capture what's on your mind."
+                  : 'Completed and killed goals will appear here.'}
+              </Text>
+            </View>
+          ) : (
+            <NestableDraggableFlatList
+              data={visibleTasks}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, drag, isActive }) => (
                 <ScaleDecorator>
                   <TouchableOpacity
                     onLongPress={drag}
@@ -177,15 +217,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     {renderTask({ item })}
                   </TouchableOpacity>
                 </ScaleDecorator>
-            )}
-            onDragEnd={({ data, from, to }) => {
-              if (from !== to) {
-                reorderTasks(data, from, to);
-              }
-            }}
-            contentContainerStyle={styles.listContent}
-          />
-        )}
+              )}
+              onDragEnd={({ data, from, to }) => {
+                if (from !== to) {
+                  reorderTasks(data, from, to);
+                }
+              }}
+            />
+          )}
+        </NestableScrollContainer>
       </View>
       <PinWarningModal
         visible={isPinWarningVisible}
@@ -249,6 +289,10 @@ const getStyles = (colors: ThemeColors) => StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 120, // Space for floating button
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   sectionHeader: {
     marginTop: 24,

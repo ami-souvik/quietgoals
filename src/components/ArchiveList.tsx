@@ -106,14 +106,14 @@ export function ArchiveList({
                       key={goal.id}
                       layout
                       initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 52 }}
+                      animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0, marginBottom: -8 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      className="group flex h-[52px] items-center justify-between rounded-lg border border-border bg-surface px-4 transition-colors hover:border-border-subtle hover:bg-surface-hover"
+                      className="group flex min-h-[52px] items-center justify-between rounded-lg border border-border bg-surface py-3 px-4 transition-colors hover:border-border-subtle hover:bg-surface-hover"
                     >
                       {/* Left: Gold check + Title */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
+                      <div className="flex items-start gap-3 min-w-0 flex-1 mr-3">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold mt-0.5">
                           <svg
                             className="h-3 w-3 stroke-[2.5]"
                             fill="none"
@@ -127,7 +127,7 @@ export function ArchiveList({
                             />
                           </svg>
                         </span>
-                        <span className="truncate text-sm font-normal text-text-primary">
+                        <span className="break-words whitespace-normal text-sm font-normal text-text-primary">
                           {goal.title}
                         </span>
                       </div>
@@ -224,14 +224,14 @@ export function ArchiveList({
                       key={goal.id}
                       layout
                       initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 52 }}
+                      animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0, marginBottom: -8 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      className="group flex h-[52px] items-center justify-between rounded-lg border border-border bg-surface px-4 transition-colors hover:border-border-subtle hover:bg-surface-hover"
+                      className="group flex min-h-[52px] items-center justify-between rounded-lg border border-border bg-surface py-3 px-4 transition-colors hover:border-border-subtle hover:bg-surface-hover"
                     >
                       {/* Left: Ember cross mark + Title */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ember-muted/20 text-ember">
+                      <div className="flex items-start gap-3 min-w-0 flex-1 mr-3">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ember-muted/20 text-ember mt-0.5">
                           <svg
                             className="h-3 w-3 stroke-[2.5]"
                             fill="none"
@@ -245,7 +245,7 @@ export function ArchiveList({
                             />
                           </svg>
                         </span>
-                        <span className="truncate text-sm font-normal text-text-secondary">
+                        <span className="break-words whitespace-normal text-sm font-normal text-text-secondary">
                           {goal.title}
                         </span>
                       </div>

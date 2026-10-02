@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Dimensions, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
@@ -89,6 +89,8 @@ interface CreatorContextType {
     // Actions
     toggleBgMode: () => void;
     refreshImage: (mood?: MoodType) => void;
+    refreshTasks: () => Promise<void>;
+    isRefreshing: boolean;
     handlePickImage: () => void;
     saveWallpaper: () => Promise<void>;
     setWallpaper: (type: 'screen' | 'lock' | 'both') => Promise<void>;
@@ -105,6 +107,7 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const [activeGoal, setActiveGoal] = useState<ActiveGoal | null>(null);
     const [history, setHistory] = useState<ActiveGoal[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     
     const { data: session } = useSession();
     
@@ -141,6 +144,83 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const userEmail = session?.user?.email ?? null;
 
+    const refreshTasks = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            if (userEmail) {
+                const res = await authenticatedFetch('/api/goals');
+                if (res.ok) {
+                    const data = await res.json();
+                    const activeTasks: TodoItem[] = (data.activeGoals || []).map((g: any) => ({
+                        id: g.id,
+                        text: g.title,
+                        title: g.title,
+                        completed: false,
+                        status: g.status as 'active' | 'completed' | 'killed',
+                        priority: g.priority,
+                        position: g.position,
+                        isPinned: Boolean(g.isPinned),
+                        createdAt: g.createdAt,
+                    }));
+
+                    const archivedTasks: TodoItem[] = (data.archivedGoals || []).map((g: any) => ({
+                        id: g.id,
+                        text: g.title,
+                        title: g.title,
+                        completed: true,
+                        status: (g.status as 'completed' | 'killed') || 'completed',
+                        priority: g.priority,
+                        position: g.position,
+                        isPinned: false,
+                        createdAt: g.createdAt,
+                    }));
+
+                    const remoteTasks = [...activeTasks, ...archivedTasks];
+                    const localTasks = await getTasks(userEmail);
+                    const remoteIds = new Set(remoteTasks.map(t => t.id));
+                    const localOnly = localTasks.filter(t => !remoteIds.has(t.id));
+
+                    if (localOnly.length > 0) {
+                        await authenticatedFetch('/api/goals/sync', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                offlineTasks: localOnly.map(t => ({
+                                    id: t.id,
+                                    title: t.text || t.title || 'Untitled',
+                                    status: t.status || (t.completed ? 'completed' : 'active'),
+                                    createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+                                }))
+                            })
+                        }).catch(console.error);
+                    }
+
+                    const combined = [...localOnly, ...remoteTasks];
+                    setAllTasks(combined);
+                    await storageSaveTasks(combined, userEmail);
+
+                    const pinnedTasks = combined.filter(t => t.isPinned && !t.completed);
+                    if (pinnedTasks.length > 0) {
+                        const newGoal: ActiveGoal = {
+                            type: 'todo',
+                            text: pinnedTasks[0].text || 'My Tasks',
+                            todoItems: pinnedTasks,
+                            timestamp: Date.now()
+                        };
+                        setActiveGoal(newGoal);
+                        updateWidget(JSON.stringify(newGoal));
+                    }
+                }
+            } else {
+                const guestTasks = await getTasks(null);
+                setAllTasks(guestTasks);
+            }
+        } catch (err) {
+            console.warn('[Sync] Could not refresh remote goals:', err);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [userEmail]);
+
     useEffect(() => {
         let isCancelled = false;
 
@@ -158,7 +238,7 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             if (userEmail) {
                 // 1. Automatically migrate offline/guest tasks into this signed-in email account
-                const migratedTasks = await migrateGuestTasksToUser(userEmail);
+                await migrateGuestTasksToUser(userEmail);
 
                 // 2. Load cached tasks, goal, and history for this user's email
                 const localTasks = await getTasks(userEmail);
@@ -181,48 +261,8 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
 
                 // 3. Fetch remote goals from server for this user
-                try {
-                    const res = await authenticatedFetch('/api/goals');
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.activeGoals && !isCancelled) {
-                            const remoteTasks: TodoItem[] = data.activeGoals.map((g: any) => ({
-                                id: g.id,
-                                text: g.title,
-                                title: g.title,
-                                completed: false,
-                                status: g.status as 'active' | 'completed' | 'killed',
-                                priority: g.priority,
-                                position: g.position,
-                                isPinned: g.isPinned,
-                                createdAt: g.createdAt,
-                            }));
-
-                            // If we had migrated guest tasks not yet on server, upload them
-                            const remoteIds = new Set(remoteTasks.map(t => t.id));
-                            const localOnly = (migratedTasks.length > 0 ? migratedTasks : localTasks).filter(t => !remoteIds.has(t.id));
-
-                            if (localOnly.length > 0) {
-                                await authenticatedFetch('/api/goals/sync', {
-                                    method: 'POST',
-                                    body: JSON.stringify({
-                                        offlineTasks: localOnly.map(t => ({
-                                            id: t.id,
-                                            title: t.text || t.title || 'Untitled',
-                                            status: t.status || (t.completed ? 'completed' : 'active'),
-                                            createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
-                                        }))
-                                    })
-                                }).catch(console.error);
-                            }
-
-                            const combined = [...localOnly, ...remoteTasks];
-                            setAllTasks(combined);
-                            await storageSaveTasks(combined, userEmail);
-                        }
-                    }
-                } catch (err) {
-                    console.warn('[Sync] Could not sync remote goals:', err);
+                if (!isCancelled) {
+                    await refreshTasks();
                 }
             } else {
                 // Guest mode (logged out)
@@ -250,7 +290,7 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return () => {
             isCancelled = true;
         };
-    }, [userEmail]);
+    }, [userEmail, refreshTasks]);
 
     // Task Actions
     const syncPinnedTasksToGoal = async (tasks: TodoItem[]) => {
@@ -639,6 +679,7 @@ export const CreatorProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 isPinWarningVisible, hidePinWarning, handlePinWarningAccept,
                 viewShotRef,
                 refreshImage, handlePickImage,
+                refreshTasks, isRefreshing,
                 saveWallpaper, setWallpaper,
                 saveTodoGoal,
                 deleteFromHistory,

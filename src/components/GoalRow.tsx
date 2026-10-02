@@ -195,7 +195,7 @@ export function GoalRow({
             }
           : undefined
       }
-      className={`group relative flex h-[52px] items-center justify-between rounded-lg border px-4 transition-colors duration-150 select-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-1 focus-visible:ring-offset-bg touch-manipulation overflow-hidden ${
+      className={`group relative flex min-h-[52px] items-center justify-between rounded-lg border py-3 px-4 transition-colors duration-150 select-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-1 focus-visible:ring-offset-bg touch-manipulation overflow-hidden ${
         isExiting ? 'pointer-events-none' : 'cursor-pointer'
       } ${rowStyleClass}`}
     >
@@ -226,9 +226,9 @@ export function GoalRow({
       )}
 
       {/* Left: Index / Grip + Title / Inline Input */}
-      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3 relative z-10">
+      <div className="flex items-start gap-3 min-w-0 flex-1 mr-3 relative z-10">
         <span
-          className={`tabular-nums font-mono text-xs select-none w-5 shrink-0 transition-opacity ${
+          className={`tabular-nums font-mono text-xs select-none w-5 shrink-0 pt-0.5 transition-opacity ${
             exitStatus === 'killed'
               ? 'text-ember/50'
               : isFocused
@@ -258,7 +258,7 @@ export function GoalRow({
               setEditTitle(goal.title);
               onStartEdit();
             }}
-            className={`truncate text-sm font-normal transition-colors ${
+            className={`break-words whitespace-normal text-sm font-normal transition-colors ${
               exitStatus === 'killed'
                 ? 'line-through text-text-muted/60'
                 : exitStatus === 'completed'

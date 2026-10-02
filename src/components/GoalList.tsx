@@ -185,7 +185,7 @@ function ReorderableGoalItem({
                 y: exitStatus === 'killed' && !shouldReduceMotion ? 6 : 0,
               }
               : {
-                height: 52,
+                height: 'auto',
                 opacity: 1,
                 marginBottom: 0,
                 y: 0,
@@ -1097,8 +1097,8 @@ export function GoalList({
                     transition={springTransition}
                     className="overflow-hidden"
                   >
-                    <div className="flex h-[52px] items-center justify-between rounded-lg border border-ember/30 bg-ember-muted/10 px-4">
-                      <span className="truncate text-sm text-text-muted line-through">
+                    <div className="flex min-h-[52px] items-center justify-between rounded-lg border border-ember/30 bg-ember-muted/10 py-3 px-4">
+                      <span className="break-words whitespace-normal text-sm text-text-muted line-through mr-3">
                         {failed.title}
                       </span>
 
