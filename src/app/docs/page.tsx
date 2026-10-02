@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function AgentDocsPage() {
   const [activeTab, setActiveTab] = useState<'claude' | 'cursor' | 'curl'>('claude');
@@ -78,9 +79,12 @@ export default function AgentDocsPage() {
               <span>Back to Goals</span>
             </Link>
 
-            <span className="text-[11px] font-mono text-text-muted uppercase tracking-wider bg-surface px-2 py-0.5 rounded border border-border">
-              MCP v2024-11-05
-            </span>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <span className="text-[11px] font-mono text-text-muted uppercase tracking-wider bg-surface px-2 py-0.5 rounded border border-border">
+                MCP v2024-11-05
+              </span>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -267,7 +271,7 @@ export default function AgentDocsPage() {
                   Retrieves user goals ordered by current list position.
                 </p>
                 <div className="text-[11px] font-mono text-text-muted pt-1">
-                  Args: <span className="text-text-primary">status</span> (&apos;active&apos; | &apos;completed&apos; | &apos;killed&apos; | &apos;all&apos;)
+                  Args: <span className="text-text-primary">status</span> (&apos;active&apos; | &apos;not-started&apos; | &apos;in-progress&apos; | &apos;completed&apos; | &apos;killed&apos; | &apos;all&apos;)
                 </div>
               </div>
 
@@ -277,10 +281,10 @@ export default function AgentDocsPage() {
                   <span className="text-[10px] font-mono text-text-muted bg-bg px-1.5 py-0.5 rounded border border-border">write</span>
                 </div>
                 <p className="text-xs text-text-secondary">
-                  Appends a new goal to the active list using fractional indexing.
+                  Appends a new goal with fractional indexing, optional description and link.
                 </p>
                 <div className="text-[11px] font-mono text-text-muted pt-1">
-                  Args: <span className="text-text-primary">title*</span> (string, 1-200 chars), <span className="text-text-primary">priority</span> (&apos;none&apos; | &apos;low&apos; | &apos;medium&apos; | &apos;high&apos;)
+                  Args: <span className="text-text-primary">title*</span>, <span className="text-text-primary">priority</span>, <span className="text-text-primary">status</span> (&apos;not-started&apos; | &apos;in-progress&apos; | &apos;completed&apos;), <span className="text-text-primary">description</span>, <span className="text-text-primary">link</span>
                 </div>
               </div>
 
@@ -290,10 +294,10 @@ export default function AgentDocsPage() {
                   <span className="text-[10px] font-mono text-text-muted bg-bg px-1.5 py-0.5 rounded border border-border">write</span>
                 </div>
                 <p className="text-xs text-text-secondary">
-                  Modifies the title or priority of an existing goal by ID.
+                  Modifies title, priority, status, description, or link of an existing goal by ID.
                 </p>
                 <div className="text-[11px] font-mono text-text-muted pt-1">
-                  Args: <span className="text-text-primary">id*</span> (UUID), <span className="text-text-primary">title</span> (string), <span className="text-text-primary">priority</span> (string)
+                  Args: <span className="text-text-primary">id*</span> (UUID), <span className="text-text-primary">title</span>, <span className="text-text-primary">priority</span>, <span className="text-text-primary">status</span>, <span className="text-text-primary">description</span>, <span className="text-text-primary">link</span>
                 </div>
               </div>
 

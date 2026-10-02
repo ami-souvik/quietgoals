@@ -21,6 +21,8 @@ export default function DesignMdPage() {
     title: 'Sample Goal Title',
     status: 'active',
     priority: priority,
+    description: null,
+    link: null,
     position: 'a',
     isPinned: false,
     createdAt: new Date().toISOString(),
