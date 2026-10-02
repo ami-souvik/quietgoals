@@ -17,6 +17,7 @@ import { CompleteParticles } from '@/components/CompleteParticles';
 import { GoalRow } from '@/components/GoalRow';
 import { ShortcutSheet } from '@/components/ShortcutSheet';
 import { SoundToggle } from '@/components/SoundToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { mutationQueue } from '@/lib/mutationQueue';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import {
@@ -24,7 +25,8 @@ import {
   play,
   setSoundEnabled,
 } from '@/lib/sound';
-import type { Goal, GoalPriority } from '@/db/schema';
+import { KanbanBoard } from '@/components/KanbanBoard';
+import type { Goal, GoalPriority, GoalStatus } from '@/db/schema';
 
 export type GoalOptimisticAction =
   | { type: 'create'; goal: Goal }
@@ -77,6 +79,9 @@ interface ReorderableItemProps {
   onCyclePriority: () => void;
   onComplete: () => void;
   onKill: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  onUpdateGoal?: (updates: Partial<Goal>) => void;
   onExitComplete: (goalId: string) => void;
   onDragEnd: (goalId: string) => void;
 }
@@ -86,12 +91,15 @@ function ReorderableGoalItem({
   index,
   isFocused,
   isEditing,
+  isExpanded = false,
   exitStatus,
   shouldReduceMotion,
   onSelect,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
+  onToggleExpand,
+  onUpdateGoal,
   onCyclePriority,
   onComplete,
   onKill,
@@ -203,12 +211,15 @@ function ReorderableGoalItem({
             index={index}
             isFocused={isFocused}
             isEditing={isEditing}
+            isExpanded={isExpanded}
             exitStatus={exitStatus}
             shouldReduceMotion={shouldReduceMotion}
             onSelect={onSelect}
             onStartEdit={onStartEdit}
             onSaveEdit={onSaveEdit}
             onCancelEdit={onCancelEdit}
+            onToggleExpand={onToggleExpand}
+            onUpdateGoal={onUpdateGoal}
             onCyclePriority={onCyclePriority}
             onComplete={onComplete}
             onKill={onKill}
@@ -260,6 +271,12 @@ export function GoalList({
 
   // View state: 'active' or 'archive'
   const [currentView, setCurrentView] = useState<'active' | 'archive'>('active');
+
+  // Layout view mode: 'list' or 'kanban'
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+
+  // Expanded row ID for task detail view
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Archive goals state: synchronized locally with zero refetch flicker
   const [archivedGoals, setArchivedGoals] = useState<Goal[]>(initialArchivedGoals);
@@ -472,12 +489,36 @@ export function GoalList({
     [activeItems, persistMove]
   );
 
+  // Helper to update goal details (description, link, status, priority, title)
+  const handleUpdateGoalDetails = useCallback(
+    (id: string, updates: Partial<Goal>) => {
+      setActiveItems((prev) =>
+        prev.map((g) => (g.id === id ? { ...g, ...updates, updatedAt: new Date().toISOString() } : g))
+      );
+      startTransition(async () => {
+        dispatchOptimistic({
+          type: 'update',
+          id,
+          data: updates,
+        });
+        await mutationQueue.enqueue('update goal details', () =>
+          updateGoal({
+            id,
+            ...updates,
+          })
+        );
+      });
+    },
+    [dispatchOptimistic]
+  );
+
   // Helper to commit creation
   const handleCommitCreate = useCallback(
     (
       titleToCommit: string,
       targetAfterPosition: string | null,
-      targetNextPosition: string | null
+      targetNextPosition: string | null,
+      initialStatus?: GoalStatus
     ) => {
       const trimmed = titleToCommit.trim();
       if (!trimmed) {
@@ -494,8 +535,10 @@ export function GoalList({
         userId: optimisticGoals[0]?.userId ?? 'user',
         userEmail: user?.email ?? null,
         title: trimmed,
-        status: 'active',
+        status: initialStatus ?? 'not-started',
         priority: 'none',
+        description: null,
+        link: null,
         position,
         isPinned: false,
         createdAt: new Date().toISOString(),
@@ -521,6 +564,7 @@ export function GoalList({
             id,
             title: trimmed,
             position,
+            status: initialStatus ?? 'not-started',
             afterPosition: targetAfterPosition,
           })
         );
@@ -883,6 +927,47 @@ export function GoalList({
             >
               Archive <span className="tabular-nums">{archivedGoals.length}</span>
             </button>
+
+            {/* Kanban / List View Toggle Button on top layout */}
+            {currentView === 'active' && (
+              <>
+                <span className="text-border/70 select-none">·</span>
+                <div className="flex items-center rounded-md border border-border/80 bg-surface/60 p-0.5 text-xs font-mono select-none">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                      viewMode === 'list'
+                        ? 'bg-surface-active text-text-primary font-medium shadow-xs'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                    title="List view"
+                    aria-pressed={viewMode === 'list'}
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                    <span>List</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('kanban')}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                      viewMode === 'kanban'
+                        ? 'bg-gold/15 text-gold font-medium shadow-xs'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                    title="Kanban view"
+                    aria-pressed={viewMode === 'kanban'}
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.5-15h15a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5h-15a1.5 1.5 0 01-1.5-1.5v-12a1.5 1.5 0 011.5-1.5z" />
+                    </svg>
+                    <span>Kanban</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Subtle inline offline dot in header while queued */}
@@ -902,7 +987,8 @@ export function GoalList({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
           <SoundToggle enabled={soundOn} onToggle={handleToggleSound} />
           {user && (
             <AccountMenu user={user} />
@@ -920,63 +1006,86 @@ export function GoalList({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, ease: 'easeInOut' }}
           >
-            <div className="space-y-2">
-              {itemsToRender.length === 0 && !isAddingBottom ? (
-                /* Empty state: one line of copy and a single "new goal" affordance. No illustrations. */
-                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                  <p className="text-xs text-text-muted font-mono">
-                    no goals yet — your list is quiet.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInsertBelowId(null);
-                      setIsAddingBottom(true);
-                      setTimeout(() => bottomInputRef.current?.focus(), 10);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-secondary hover:text-text-primary hover:border-gold/50 hover:bg-surface-hover transition-colors focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-gold cursor-pointer"
+            {viewMode === 'kanban' ? (
+              <KanbanBoard
+                goals={itemsToRender}
+                archivedGoals={archivedGoals}
+                onUpdateGoal={handleUpdateGoalDetails}
+                onArchiveGoal={handleArchive}
+                onCreateGoal={(title, status) => {
+                  const lastGoal = itemsToRender[itemsToRender.length - 1];
+                  handleCommitCreate(title, lastGoal ? lastGoal.position : null, null, status);
+                }}
+                onRestoreGoal={(g) => handleRestoreGoal(g)}
+              />
+            ) : (
+              <div className="space-y-2">
+                {itemsToRender.length === 0 && !isAddingBottom ? (
+                  /* Empty state: one line of copy and a single "new goal" affordance. No illustrations. */
+                  <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                    <p className="text-xs text-text-muted font-mono">
+                      no goals yet — your list is quiet.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInsertBelowId(null);
+                        setIsAddingBottom(true);
+                        setTimeout(() => bottomInputRef.current?.focus(), 10);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-secondary hover:text-text-primary hover:border-gold/50 hover:bg-surface-hover transition-colors focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-gold cursor-pointer"
+                    >
+                      <span>+ new goal</span>
+                      <span className="text-[10px] text-text-muted/70">press n</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Pointer Drag Reorder Group */}
+                    <Reorder.Group
+                    axis="y"
+                    values={itemsToRender}
+                    onReorder={handleReorder}
+                    className="space-y-2"
                   >
-                    <span>+ new goal</span>
-                    <span className="text-[10px] text-text-muted/70">press n</span>
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Pointer Drag Reorder Group */}
-                  <Reorder.Group
-                  axis="y"
-                  values={itemsToRender}
-                  onReorder={handleReorder}
-                  className="space-y-2"
-                >
-                <AnimatePresence initial={false}>
-                  {itemsToRender.map((goal, index) => {
-                    const isFocused = goal.id === focusedId;
-                    const isEditing = goal.id === editingId;
-                    const isInsertBelowActive = insertBelowId === goal.id;
-                    const exitStatus = exitingMap[goal.id] ?? null;
+                  <AnimatePresence initial={false}>
+                    {itemsToRender.map((goal, index) => {
+                      const isFocused = goal.id === focusedId;
+                      const isEditing = goal.id === editingId;
+                      const isExpanded = goal.id === expandedId;
+                      const isInsertBelowActive = insertBelowId === goal.id;
+                      const exitStatus = exitingMap[goal.id] ?? null;
 
-                    return (
-                      <div key={goal.id} className="space-y-2">
-                        <ReorderableGoalItem
-                          goal={goal}
-                          index={index}
-                          isFocused={isFocused}
-                          isEditing={isEditing}
-                          exitStatus={exitStatus}
-                          shouldReduceMotion={shouldReduceMotion}
-                          onSelect={() => {
-                            if (!exitStatus) {
-                              setFocusedId(goal.id);
-                              setEditingId(null);
-                            }
-                          }}
-                          onStartEdit={() => {
-                            if (!exitStatus) {
-                              setFocusedId(goal.id);
-                              setEditingId(goal.id);
-                            }
-                          }}
+                      return (
+                        <div key={goal.id} className="space-y-2">
+                          <ReorderableGoalItem
+                            goal={goal}
+                            index={index}
+                            isFocused={isFocused}
+                            isEditing={isEditing}
+                            isExpanded={isExpanded}
+                            exitStatus={exitStatus}
+                            shouldReduceMotion={shouldReduceMotion}
+                            onSelect={() => {
+                              if (!exitStatus) {
+                                setFocusedId(goal.id);
+                                setEditingId(null);
+                              }
+                            }}
+                            onToggleExpand={() => {
+                              if (!exitStatus) {
+                                setExpandedId((prev) => (prev === goal.id ? null : goal.id));
+                                setFocusedId(goal.id);
+                                setEditingId(null);
+                              }
+                            }}
+                            onUpdateGoal={(updates) => handleUpdateGoalDetails(goal.id, updates)}
+                            onStartEdit={() => {
+                              if (!exitStatus) {
+                                setFocusedId(goal.id);
+                                setEditingId(goal.id);
+                              }
+                            }}
                           onSaveEdit={(newTitleToSave) => {
                             setEditingId(null);
                             const trimmed = newTitleToSave.trim();
@@ -1183,6 +1292,7 @@ export function GoalList({
                 </>
               )}
             </div>
+            )}
 
             {/* Footer count indicator & Shortcuts trigger */}
             <footer className="mt-6 flex items-center justify-between px-1 text-xs text-text-muted font-mono">
