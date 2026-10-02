@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
-import { goals, type Goal, type GoalPriority } from './schema';
+import { goals, type Goal, type GoalPriority, type GoalStatus } from './schema';
 
 export async function listActiveGoals(userId: string, userEmail?: string): Promise<Goal[]> {
   const userCondition = userEmail
@@ -10,7 +10,7 @@ export async function listActiveGoals(userId: string, userEmail?: string): Promi
   return db
     .select()
     .from(goals)
-    .where(and(userCondition, eq(goals.status, 'active')))
+    .where(and(userCondition, inArray(goals.status, ['not-started', 'in-progress', 'active'])))
     .orderBy(asc(goals.position));
 }
 
@@ -37,6 +37,9 @@ export async function createGoal(
     title: string;
     position: string;
     priority?: GoalPriority;
+    status?: GoalStatus;
+    description?: string | null;
+    link?: string | null;
     userEmail?: string;
   },
 ): Promise<Goal> {
@@ -48,7 +51,9 @@ export async function createGoal(
       title: input.title,
       position: input.position,
       priority: input.priority ?? 'none',
-      status: 'active',
+      status: input.status ?? 'not-started',
+      description: input.description ?? null,
+      link: input.link ?? null,
     })
     .returning();
 
@@ -61,6 +66,9 @@ export async function updateGoal(
   input: {
     title?: string;
     priority?: GoalPriority;
+    status?: GoalStatus;
+    description?: string | null;
+    link?: string | null;
   },
   userEmail?: string,
 ): Promise<Goal | undefined> {
@@ -140,7 +148,7 @@ export async function restoreGoal(
   const [restored] = await db
     .update(goals)
     .set({
-      status: 'active',
+      status: 'not-started',
       position,
       archivedAt: null,
       updatedAt: now,

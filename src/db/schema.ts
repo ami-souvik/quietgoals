@@ -117,12 +117,16 @@ export const goals = sqliteTable(
       .references(() => user.id, { onDelete: 'cascade' }),
     userEmail: text('user_email'),
     title: text('title').notNull(),
-    status: text('status', { enum: ['active', 'completed', 'killed'] })
+    status: text('status', {
+      enum: ['not-started', 'in-progress', 'completed', 'killed', 'active'],
+    })
       .notNull()
-      .default('active'),
+      .default('not-started'),
     priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] })
       .notNull()
       .default('none'),
+    description: text('description'),
+    link: text('link'),
     isPinned: integer('is_pinned', { mode: 'boolean' })
       .notNull()
       .default(false),
@@ -184,5 +188,5 @@ export type NewGoal = typeof goals.$inferInsert;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type NewApiToken = typeof apiTokens.$inferInsert;
 
-export type GoalStatus = 'active' | 'completed' | 'killed';
+export type GoalStatus = 'not-started' | 'in-progress' | 'completed' | 'killed' | 'active';
 export type GoalPriority = 'none' | 'low' | 'medium' | 'high';

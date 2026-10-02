@@ -7,8 +7,10 @@ export interface TodoItem {
   text: string; // Legacy, map to title
   title?: string;
   completed: boolean; // Legacy, map to status
-  status?: 'active' | 'completed' | 'killed';
+  status?: 'not-started' | 'in-progress' | 'completed' | 'killed' | 'active';
   priority?: 'none' | 'low' | 'medium' | 'high';
+  description?: string | null;
+  link?: string | null;
   position?: string;
   project?: string;
   isPinned?: boolean;
